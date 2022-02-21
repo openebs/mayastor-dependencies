@@ -1,0 +1,2 @@
+# mayastor-dependencies
+MayaData Dependencies
