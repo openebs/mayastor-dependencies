@@ -1,0 +1,3 @@
+[submodule "composer/mayastor-api"]
+	path = composer/mayastor-api
+	url = https://github.com/openebs/mayastor-api

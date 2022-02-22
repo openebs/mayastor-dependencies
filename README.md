@@ -1,2 +1,2 @@
 # mayastor-dependencies
-MayaData Dependencies
+Common set of dependencies used by mayastor components.
