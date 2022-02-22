@@ -8,25 +8,24 @@ edition = "2018"
 
 [features]
 default = [ "rpc" ]
-rpc = []
+rpc = [ "tonic" ]
 
 [build-dependencies]
 tonic-build = "0.5.2"
 prost-build = "0.8.0"
 
 [dependencies]
-once_cell = "1.8.0"
-tokio = { version = "1.12.0", features = [ "full" ] }
-futures = "0.3.17"
-tonic = "0.5.2"
-crossbeam = "0.8.1"
-ipnetwork = "0.18.0"
-bollard = "0.11.0"
-tracing = "0.1.28"
-tracing-subscriber = "0.2.24"
 prost = "0.8.0"
 prost-derive = "0.8.0"
 prost-types = "0.8.0"
+tokio = { version = "1.12.0", features = [ "full" ] }
+futures = "0.3.17"
+tracing = "0.1.28"
+tracing-subscriber = "0.2.24"
+tonic = { version = "0.5.2", optional = true }
+once_cell = "1.8.0"
+ipnetwork = "0.18.0"
+bollard = "0.11.0"
 serde = { version = "1.0.130", features = ["derive"] }
 serde_derive = "1.0.130"
 serde_json = "1.0.68"

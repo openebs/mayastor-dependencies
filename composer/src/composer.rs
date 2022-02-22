@@ -522,7 +522,7 @@ impl Builder {
                         if let Ok(ip) = ip.parse() {
                             tracing::debug!("Reloading existing container: {}", n);
                             self.existing_containers
-                                .insert(n[1..].into(), (container.id.unwrap_or_default(), ip));
+                                .insert(n[1 ..].into(), (container.id.unwrap_or_default(), ip));
                         }
                     }
                 }
@@ -542,7 +542,7 @@ impl Builder {
 
     /// finds the next unused ip
     pub fn next_ip(&self) -> Result<Ipv4Addr, Error> {
-        for ip in 2..=255u32 {
+        for ip in 2 ..= 255u32 {
             if let Some(ip) = self.network.nth(ip) {
                 if self.existing_containers.values().all(|(_, e)| e != &ip)
                     && self.containers.iter().all(|(_, e)| e != &ip)

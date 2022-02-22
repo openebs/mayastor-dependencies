@@ -1,9 +1,11 @@
 #![cfg(feature = "rpc")]
 
 use mayastor::{bdev_rpc_client::BdevRpcClient, mayastor_client::MayastorClient};
-use std::net::{SocketAddr, TcpStream};
-use std::thread;
-use std::time::Duration;
+use std::{
+    net::{SocketAddr, TcpStream},
+    thread,
+    time::Duration,
+};
 use tonic::transport::Channel;
 
 pub mod mayastor {
