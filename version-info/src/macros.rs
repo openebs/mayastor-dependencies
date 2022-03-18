@@ -3,7 +3,7 @@
 macro_rules! version_info {
     () => {
         $crate::VersionInfo::new(
-            $crate::raw_version_string(),
+            String::from($crate::long_raw_version_str()),
             String::from(env!("CARGO_PKG_NAME")),
             String::from(env!("CARGO_PKG_DESCRIPTION")),
             String::from(env!("CARGO_PKG_VERSION")),

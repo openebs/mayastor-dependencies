@@ -1,4 +1,4 @@
-use crate::git_utils::parse_git_version;
+use crate::git_utils::GitVersion;
 use std::fmt::{Display, Formatter};
 
 /// Version information for source code.
@@ -8,7 +8,7 @@ pub struct VersionInfo {
     pub commit_hash: String,
 
     /// Version tag on which the product was built.
-    pub version_tag: String,
+    pub version_tag: Option<String>,
 
     /// Cargo package name.
     pub pkg_name: String,
@@ -40,11 +40,19 @@ impl From<VersionInfo> for String {
 
 impl Display for VersionInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "version {}, revision {} ({})",
-            self.pkg_version, self.commit_hash, self.version_tag
-        )
+        if let Some(ref tag) = self.version_tag {
+            write!(
+                f,
+                "version {}, revision {} ({})",
+                self.pkg_version, self.commit_hash, tag
+            )
+        } else {
+            write!(
+                f,
+                "version {}, revision {}",
+                self.pkg_version, self.commit_hash
+            )
+        }
     }
 }
 
@@ -58,7 +66,7 @@ impl VersionInfo {
         bin_name: Option<String>,
         build_type: String,
     ) -> Self {
-        let p = parse_git_version(&git_ver);
+        let gv = GitVersion::parse_git_ver(&git_ver);
 
         let pkg_name = if pkg_name.is_empty() {
             String::from("unknown")
@@ -67,8 +75,8 @@ impl VersionInfo {
         };
 
         VersionInfo {
-            commit_hash: p.2,
-            version_tag: p.0,
+            commit_hash: gv.commit_hash,
+            version_tag: gv.tag,
             pkg_name,
             pkg_description,
             pkg_version,
