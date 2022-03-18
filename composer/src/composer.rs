@@ -25,8 +25,8 @@ use ipnetwork::Ipv4Network;
 use once_cell::sync::OnceCell;
 
 use bollard::{
-    container::KillContainerOptions, image::CreateImageOptions, models::ContainerInspectResponse,
-    network::DisconnectNetworkOptions,
+    auth::DockerCredentials, container::KillContainerOptions, image::CreateImageOptions,
+    models::ContainerInspectResponse, network::DisconnectNetworkOptions,
 };
 
 #[cfg(feature = "rpc")]
@@ -1323,6 +1323,15 @@ impl ComposeTest {
 
     /// Pulls the docker image
     async fn pull_image(&self, image: &str) {
+        let credentials = match (std::env::var("DOCKER_USER"), std::env::var("DOCKER_PASS")) {
+            (Ok(username), Ok(password)) => Some(DockerCredentials {
+                username: Some(username),
+                password: Some(password),
+                ..Default::default()
+            }),
+            _ => None,
+        };
+
         let mut stream = self
             .docker
             .create_image(
@@ -1331,7 +1340,7 @@ impl ComposeTest {
                     ..Default::default()
                 }),
                 None,
-                None,
+                credentials,
             )
             .into_future()
             .await;
