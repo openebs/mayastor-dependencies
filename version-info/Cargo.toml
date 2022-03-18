@@ -1,0 +1,11 @@
+[package]
+name = "version-info"
+version = "0.1.0"
+edition = "2018"
+authors = [
+  "Dmitry Savitskiy <dmitry.savitsky@mayadata.io>",
+]
+
+[dependencies]
+git-version = "0.3.5"
+regex = "1"
