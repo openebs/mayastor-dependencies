@@ -25,9 +25,13 @@ use ipnetwork::Ipv4Network;
 use once_cell::sync::OnceCell;
 
 use bollard::{
-    auth::DockerCredentials, container::KillContainerOptions, image::CreateImageOptions,
-    models::ContainerInspectResponse, network::DisconnectNetworkOptions,
+    auth::DockerCredentials,
+    container::KillContainerOptions,
+    image::CreateImageOptions,
+    models::{ContainerCreateResponse, ContainerInspectResponse},
+    network::DisconnectNetworkOptions,
 };
+use futures::future::try_join_all;
 
 #[cfg(feature = "rpc")]
 use crate::rpc::RpcHandle;
@@ -790,8 +794,24 @@ impl Builder {
 
         compose.network_id = compose.network_create().await.map_err(|e| e.to_string())?;
 
-        for (spec, ip) in self.containers {
-            compose.create_container(&spec, ip).await?;
+        let compose_ref = &compose;
+        let create_threads = self
+            .containers
+            .iter()
+            .map(|(spec, ip)| async move {
+                let response = compose_ref.create_container(spec, *ip).await;
+                response.map(|r| (r, spec, *ip))
+            })
+            .collect::<Vec<_>>();
+
+        tracing::trace!("Creating all containers");
+        let result = try_join_all(create_threads).await?;
+        tracing::trace!("Created all containers");
+
+        for (response, spec, ip) in result {
+            compose
+                .containers
+                .insert(spec.name.to_string(), (response.id, ip));
         }
 
         Ok(compose)
@@ -955,16 +975,24 @@ impl ComposeTest {
     /// remove all containers from the network
     pub async fn prune_network_containers(&self, network: &str, prune: bool) -> Result<(), Error> {
         let containers = self.list_network_containers(network).await?;
+        let mut prune_containers = Vec::with_capacity(containers.len());
         for k in &containers {
             let name = k.id.clone().unwrap();
             tracing::trace!("Lookup container for removal: {:?}", k.names);
             if prune || (self.prune_matching && self.containers.get(&name).is_some()) {
-                self.remove_container(&name).await?;
-                while let Ok(_c) = self.docker.inspect_container(&name, None).await {
-                    tokio::time::sleep(Duration::from_millis(500)).await;
-                }
+                prune_containers.push(async move {
+                    let remove = self.remove_container(&name).await;
+                    if remove.is_ok() {
+                        while let Ok(_c) = self.docker.inspect_container(&name, None).await {
+                            tokio::time::sleep(Duration::from_millis(50)).await;
+                        }
+                    }
+                    remove
+                });
             }
         }
+        try_join_all(prune_containers).await?;
+        tracing::trace!("Pruned all containers");
         Ok(())
     }
 
@@ -1089,10 +1117,10 @@ impl ComposeTest {
     /// container into our network configuration (3) config: the actual
     /// config which includes the above objects
     async fn create_container(
-        &mut self,
+        &self,
         spec: &ContainerSpec,
         ipv4: Ipv4Addr,
-    ) -> Result<(), Error> {
+    ) -> Result<ContainerCreateResponse, Error> {
         tracing::debug!("Creating container: {}", spec.name);
 
         if self.prune || self.prune_matching {
@@ -1290,13 +1318,9 @@ impl ComposeTest {
         let container = self
             .docker
             .create_container(Some(CreateContainerOptions { name }), config)
-            .await
-            .unwrap();
+            .await?;
 
-        self.containers
-            .insert(name.to_string(), (container.id, ipv4));
-
-        Ok(())
+        Ok(container)
     }
 
     /// Pulls the docker image, if one is specified and is not present locally
