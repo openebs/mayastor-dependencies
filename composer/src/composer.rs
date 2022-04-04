@@ -133,6 +133,10 @@ impl Binary {
         self.binds.insert(container.to_string(), host.to_string());
         self
     }
+    /// use a volume binds between the same host path and container container
+    pub fn with_direct_bind(self, path: &str) -> Self {
+        self.with_bind(path, path)
+    }
     /// run the container as privileged
     pub fn with_privileged(mut self, enable: Option<bool>) -> Self {
         self.privileged = enable;
@@ -350,6 +354,10 @@ impl ContainerSpec {
         self.binds.insert(container.to_string(), host.to_string());
         self
     }
+    /// Use a volume binds between the same host path and container container
+    pub fn with_direct_bind(self, path: &str) -> Self {
+        self.with_bind(path, path)
+    }
     /// List of volume binds with each element as host:container
     fn binds(&self) -> Vec<String> {
         let mut vec = vec![];
@@ -361,6 +369,7 @@ impl ContainerSpec {
                 vec.push(format!("{}:{}", host, container));
             });
         }
+        vec.dedup();
         vec
     }
     /// Run the container as privileged
@@ -717,6 +726,17 @@ impl Builder {
             compose.start_all().await?;
         }
         Ok(compose)
+    }
+
+    /// Modify/Map existing container spec's.
+    /// Handy to bulk-modify all containers.
+    pub fn with_spec_map(mut self, mut fnn: impl FnMut(ContainerSpec) -> ContainerSpec) -> Builder {
+        self.containers = self
+            .containers
+            .into_iter()
+            .map(|(s, i)| (fnn(s), i))
+            .collect::<Vec<_>>();
+        self
     }
 
     fn override_flags(flag: &mut bool, flag_name: &str) {
