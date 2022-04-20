@@ -614,7 +614,7 @@ impl Builder {
     pub fn add_container(self, name: &str) -> Builder {
         self.add_container_spec(ContainerSpec::from_binary(
             name,
-            Binary::from_path("mayastor"),
+            Binary::from_path("io-engine"),
         ))
     }
 

@@ -59,7 +59,7 @@ fn wait_for_mayastor_ready(listening_port: u32) -> Result<(), String> {
         if result.is_ok() {
             // FIXME: For some reason mayastor may still not be ready
             // at this point, and can still refuse a connection from
-            // mayastor-client. Need to rethink this approach,
+            // io-engine-client. Need to rethink this approach,
             // but just add an extra sleep for now.
             thread::sleep(Duration::from_secs(2));
             return Ok(());
@@ -85,15 +85,15 @@ impl NvmfTarget {
                 }
                 match std::str::from_utf8(&output.stderr) {
                     Ok(s) => {
-                        println!("mayastor-client failed: {}", s);
+                        println!("io-engine-client failed: {}", s);
                     }
                     Err(_) => {
-                        println!("mayastor-client failed");
+                        println!("io-engine-client failed");
                     }
                 }
             }
             Err(error) => {
-                println!("failed to execute mayastor-client: {}", error);
+                println!("failed to execute io-engine-client: {}", error);
             }
         }
         false
@@ -110,7 +110,7 @@ impl NvmfTarget {
         wait_for_mayastor_ready(TARGET_PORT).expect("mayastor not ready");
 
         // create base bdev
-        let result = Command::new("../target/debug/mayastor-client")
+        let result = Command::new("../target/debug/io-engine-client")
             .arg("bdev")
             .arg("create")
             .arg("malloc:///m0?size_mb=64&blk_size=4096&uuid=dbe4d7eb-118a-4d15-b789-a18d9af6ff29")
@@ -120,7 +120,7 @@ impl NvmfTarget {
             println!("base bdev created");
 
             // share bdev over nvmf
-            let result = Command::new("../target/debug/mayastor-client")
+            let result = Command::new("../target/debug/io-engine-client")
                 .arg("bdev")
                 .arg("share")
                 .arg("-p")
