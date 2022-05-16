@@ -486,7 +486,7 @@ impl fmt::Display for ConnectArgs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let host_id = HOST_ID.as_str();
         write!(f, "nqn={},", self.nqn)?;
-        write!(f, "hostnqn=nqn.2019-05.io.openebs.mayastor:{},", host_id)?;
+        write!(f, "hostnqn=nqn.2019-05.io.openebs.engine:{},", host_id)?;
         write!(f, "hostid={},", host_id)?;
         write!(f, "transport={},", self.transport)?;
         write!(f, "traddr={},", self.traddr)?;

@@ -41,8 +41,8 @@ fn into_os_strs(v: &[String]) -> Vec<OsString> {
     v.iter().map(OsString::from).collect()
 }
 
-pub const TEST_NET_NAME: &str = "mayastor-testing-network";
-pub const TEST_LABEL_PREFIX: &str = "io.mayastor.test";
+pub const TEST_NET_NAME: &str = "engine-testing-network";
+pub const TEST_LABEL_PREFIX: &str = "io.engine.test";
 pub const TEST_NET_NETWORK: &str = "10.1.0.0/16";
 
 static PROJECT_ROOT: OnceCell<PathBuf> = OnceCell::new();
@@ -450,8 +450,7 @@ pub struct Builder {
     /// test. It is highly recommend you use a sane name for this as it will
     /// help you during debugging
     name: String,
-    /// containers we want to create, note these are mayastor containers
-    /// only
+    /// containers we want to create, note these are our containers only
     containers: Vec<(ContainerSpec, Ipv4Addr)>,
     /// existing containers and their (IDs, Ipv4)
     existing_containers: HashMap<ContainerName, (ContainerId, Ipv4Addr)>,
@@ -610,7 +609,7 @@ impl Builder {
         self
     }
 
-    /// add a mayastor container with a name
+    /// add an io-engine container with a name
     pub fn add_container(self, name: &str) -> Builder {
         self.add_container_spec(ContainerSpec::from_binary(
             name,

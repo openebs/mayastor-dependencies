@@ -1,2 +1,2 @@
-# mayastor-dependencies
-Common set of dependencies used by mayastor components.
+# CAS dependencies
+Common set of dependencies used by both control-plane and data-plane components.

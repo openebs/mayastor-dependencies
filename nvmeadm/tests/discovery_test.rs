@@ -28,7 +28,7 @@ const SERVED_DISK_NQN: &str = "nqn.2019-05.io.openebs:m0";
 
 const TARGET_PORT: u32 = 9523;
 
-/// Write out a config file for Mayastor, but with the specified port for nvmf
+/// Write out a config file, but with the specified port for nvmf
 fn create_config_file(config_file: &str, nvmf_port: &str) {
     let path = Path::new(config_file);
     let mut config = match File::create(&path) {
@@ -48,8 +48,8 @@ fn create_config_file(config_file: &str, nvmf_port: &str) {
     }
 }
 
-/// Wait for Mayastor to start up and accept connections on the specified port
-fn wait_for_mayastor_ready(listening_port: u32) -> Result<(), String> {
+/// Wait for the engine to start up and accept connections on the specified port
+fn wait_for_engine_ready(listening_port: u32) -> Result<(), String> {
     let dest = format!("127.0.0.1:{}", listening_port);
     let socket_addr: SocketAddr = dest.parse().expect("Badly formed address");
 
@@ -57,7 +57,7 @@ fn wait_for_mayastor_ready(listening_port: u32) -> Result<(), String> {
         let result = TcpStream::connect_timeout(&socket_addr, Duration::from_millis(100));
 
         if result.is_ok() {
-            // FIXME: For some reason mayastor may still not be ready
+            // FIXME: For some reason io-engine may still not be ready
             // at this point, and can still refuse a connection from
             // io-engine-client. Need to rethink this approach,
             // but just add an extra sleep for now.
@@ -72,7 +72,7 @@ fn wait_for_mayastor_ready(listening_port: u32) -> Result<(), String> {
 }
 
 pub struct NvmfTarget {
-    /// The std::process::Child for the process running Mayastor
+    /// The std::process::Child for the process running the IoEngine
     pub spdk_proc: std::process::Child,
 }
 
@@ -101,13 +101,13 @@ impl NvmfTarget {
 
     pub fn new(config_file: &str, nvmf_port: &str) -> Self {
         create_config_file(config_file, nvmf_port);
-        let spdk_proc = Command::new("../target/debug/mayastor")
+        let spdk_proc = Command::new("../target/debug/io-engine")
             .arg("-y")
             .arg(CONFIG_FILE)
             .spawn()
             .expect("Failed to start spdk!");
 
-        wait_for_mayastor_ready(TARGET_PORT).expect("mayastor not ready");
+        wait_for_engine_ready(TARGET_PORT).expect("engine not ready");
 
         // create base bdev
         let result = Command::new("../target/debug/io-engine-client")
