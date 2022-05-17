@@ -7,5 +7,5 @@ pub mod rpc;
 pub use rpc::RpcHandle;
 
 pub use crate::composer::{
-    initialize, Binary, Builder, BuilderConfigure, ComposeTest, ContainerSpec,
+    initialize, Binary, Builder, BuilderConfigure, ComposeTest, ContainerSpec, ImagePullPolicy,
 };

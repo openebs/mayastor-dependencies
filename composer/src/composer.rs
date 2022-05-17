@@ -42,7 +42,7 @@ fn into_os_strs(v: &[String]) -> Vec<OsString> {
 }
 
 pub const TEST_NET_NAME: &str = "engine-testing-network";
-pub const TEST_LABEL_PREFIX: &str = "io.engine.test";
+pub const TEST_LABEL_PREFIX: &str = "io.composer.test";
 pub const TEST_NET_NETWORK: &str = "10.1.0.0/16";
 
 static PROJECT_ROOT: OnceCell<PathBuf> = OnceCell::new();
@@ -189,6 +189,30 @@ impl Binary {
 const RUST_LOG_DEFAULT: &str =
     "debug,actix_web=debug,actix=debug,h2=info,hyper=info,tower_buffer=info,tower=info,bollard=info,rustls=info,reqwest=info,composer=info";
 
+/// Policy for when to pull images when creating the container.
+#[derive(Clone, Debug)]
+pub enum ImagePullPolicy {
+    /// Only pull if the image is not cached locally.
+    IfNotPresent,
+    /// Always pull when starting a container, if the locally cached image is not up to date.
+    Always,
+}
+impl Default for ImagePullPolicy {
+    fn default() -> Self {
+        Self::IfNotPresent
+    }
+}
+impl std::str::FromStr for ImagePullPolicy {
+    type Err = String;
+    fn from_str(source: &str) -> Result<Self, Self::Err> {
+        match source.to_ascii_lowercase().as_str() {
+            "ifnotpresent" => Ok(Self::IfNotPresent),
+            "always" => Ok(Self::Always),
+            _ => Err(format!("Could not parse the ImagePullPolicy: {}", source)),
+        }
+    }
+}
+
 /// Specs of the allowed containers include only the binary path
 /// (relative to src) and the required arguments
 #[derive(Default, Clone)]
@@ -197,6 +221,8 @@ pub struct ContainerSpec {
     name: ContainerName,
     /// Base image of the container
     image: Option<String>,
+    /// Image pull policy
+    image_pull_policy: ImagePullPolicy,
     /// Command to run
     command: Option<OsString>,
     /// Entrypoint
@@ -252,6 +278,11 @@ impl ContainerSpec {
             env,
             ..Default::default()
         }
+    }
+    /// Set the image pull policy
+    pub fn with_pull_policy(mut self, policy: ImagePullPolicy) -> Self {
+        self.image_pull_policy = policy;
+        self
     }
     /// Add port mapping from container to host
     pub fn with_portmap(mut self, from: &str, to: &str) -> Self {
@@ -1157,8 +1188,7 @@ impl ComposeTest {
                 .await;
         }
 
-        // pull the image, if missing
-        self.pull_missing_image(&spec.image).await;
+        self.pull_image_if_required(spec).await;
 
         let srcdir_str = self.srcdir.to_str().unwrap();
         let mut binds = vec![
@@ -1343,15 +1373,27 @@ impl ComposeTest {
     }
 
     /// Pulls the docker image, if one is specified and is not present locally
-    async fn pull_missing_image(&self, image: &Option<String>) {
-        if let Some(image) = image {
-            let image = if !image.contains(':') {
-                format!("{}:latest", image)
-            } else {
-                image.clone()
-            };
-            if !self.image_exists(&image).await {
-                self.pull_image(&image).await;
+    async fn pull_missing_image(&self, image: &str) {
+        let image = if !image.contains(':') {
+            format!("{}:latest", image)
+        } else {
+            image.to_string()
+        };
+        if !self.image_exists(&image).await {
+            self.pull_image(&image).await;
+        }
+    }
+
+    /// Pulls the docker image, if one is specified and is not present locally
+    async fn pull_image_if_required(&self, spec: &ContainerSpec) {
+        if let Some(image) = &spec.image {
+            match spec.image_pull_policy {
+                ImagePullPolicy::IfNotPresent => {
+                    self.pull_missing_image(image).await;
+                }
+                ImagePullPolicy::Always => {
+                    self.pull_image(image).await;
+                }
             }
         }
     }
@@ -1388,9 +1430,13 @@ impl ComposeTest {
             .into_future()
             .await;
 
+        let mut last = std::time::Instant::now();
         while let Some(result) = stream.0.as_ref() {
             let info = result.as_ref().unwrap();
-            tracing::trace!("{:?}", &info);
+            if last.elapsed() > std::time::Duration::from_secs(5) {
+                tracing::info!("Pulling {}: {:?}", image, &info);
+                last = std::time::Instant::now();
+            }
             stream = stream.1.into_future().await;
         }
     }
@@ -1474,7 +1520,7 @@ impl ComposeTest {
             .restart_container(id, Some(RestartContainerOptions { t: 3 }))
             .await
         {
-            // where already stopped
+            // we're already stopped
             if !matches!(e, Error::DockerResponseNotModifiedError { .. }) {
                 return Err(e);
             }
