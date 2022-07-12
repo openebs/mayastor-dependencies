@@ -1,21 +1,24 @@
-{ profile ? "nightly", date ? "2021-11-22" }:
+{ profile ? "nightly", date ? "2022-06-22" }:
 let
-  oxalica = builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/a1b1977429de5d69a332dd87700ffb00525335f9.tar.gz";
-  pkgs = import <nixpkgs> {
-    overlays = [ (import oxalica) ];
+  sources = import ./nix/sources.nix;
+  pkgs = import sources.nixpkgs {
+    overlays = [ (_: _: { inherit sources; }) (import ./nix/overlay.nix { }) ];
   };
+  rust = import sources.nixpkgs { overlays = [ (import sources.rust-overlay) ]; };
 in
 with pkgs;
 pkgs.mkShell {
-  buildInputs = with pkgs; [
-    rust-bin.${profile}.${date}.default
+  buildInputs = [
+    (rust.rust-bin.${profile}.${date}.default.override {
+      extensions = [ "rust-src" ];
+    })
     cargo-udeps
     clang
     openssl
     pkg-config
     pre-commit
     protobuf
-    libudev
+    udev
     util-linux
     nodejs
   ];

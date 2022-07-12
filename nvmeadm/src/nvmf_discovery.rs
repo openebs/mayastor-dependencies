@@ -232,14 +232,14 @@ impl Discovery {
         // NVMe_over_Fabrics_1_0_Gold_20160605-1.pdf  5.3
         cmd.cdw10 = 0x70 | numdl << 16;
 
-        let _ret = unsafe {
+        unsafe {
             convert_ioctl_res!(nix_ioctl(
                 f.as_raw_fd(),
                 u64::from(NVME_ADMIN_CMD_IOCTL),
                 &cmd
             ))
             .context(DiscoveryError)?;
-        };
+        }
 
         Ok(h.numrec)
     }
