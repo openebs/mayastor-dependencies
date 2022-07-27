@@ -725,23 +725,6 @@ impl Builder {
         self
     }
 
-    /// setup tracing for the cargo test code with `RUST_LOG` const
-    pub fn with_default_tracing(self) -> Self {
-        self.with_tracing(RUST_LOG_DEFAULT)
-    }
-
-    /// setup tracing for the cargo test code with `filter`
-    /// ignore when called multiple times
-    pub fn with_tracing(self, filter: &str) -> Self {
-        let builder = if let Ok(filter) = tracing_subscriber::EnvFilter::try_from_default_env() {
-            tracing_subscriber::fmt().with_env_filter(filter)
-        } else {
-            tracing_subscriber::fmt().with_env_filter(filter)
-        };
-        builder.try_init().ok();
-        self
-    }
-
     /// with the following shutdown order
     pub fn with_shutdown_order(mut self, shutdown: Vec<String>) -> Builder {
         self.shutdown_order = shutdown;
