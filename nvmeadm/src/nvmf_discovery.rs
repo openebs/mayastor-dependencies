@@ -9,7 +9,10 @@ use std::{
     str::FromStr,
 };
 
-use error::{ConnectError, DiscoveryError, FileIoError, NvmeError};
+use error::{
+    nvme_error::{ConnectFailed, FileIoFailed, NvmeDiscoveryFailed},
+    NvmeError,
+};
 use nix::libc::ioctl as nix_ioctl;
 use num_traits::FromPrimitive;
 use snafu::ResultExt;
@@ -177,20 +180,21 @@ impl Discovery {
         );
         let p = Path::new(NVME_FABRICS_PATH);
 
-        let mut file = OpenOptions::new()
-            .write(true)
-            .read(true)
-            .open(&p)
-            .context(FileIoError {
-                filename: NVME_FABRICS_PATH,
-            })?;
+        let mut file =
+            OpenOptions::new()
+                .write(true)
+                .read(true)
+                .open(&p)
+                .context(FileIoFailed {
+                    filename: NVME_FABRICS_PATH,
+                })?;
 
         file.write_all(self.arg_string.as_bytes())
-            .context(FileIoError {
+            .context(FileIoFailed {
                 filename: NVME_FABRICS_PATH,
             })?;
         let mut buf = String::new();
-        file.read_to_string(&mut buf).context(FileIoError {
+        file.read_to_string(&mut buf).context(FileIoFailed {
             filename: NVME_FABRICS_PATH,
         })?;
         // get the ctl=value from the controller
@@ -210,7 +214,7 @@ impl Discovery {
         let f = OpenOptions::new()
             .read(true)
             .open(Path::new(&target))
-            .context(FileIoError { filename: target })?;
+            .context(FileIoFailed { filename: target })?;
 
         // See NVM-Express1_3d 5.14
         let hdr_len = std::mem::size_of::<NvmfDiscRspPageHdr>() as u32;
@@ -238,7 +242,7 @@ impl Discovery {
                 u64::from(NVME_ADMIN_CMD_IOCTL),
                 &cmd
             ))
-            .context(DiscoveryError)?;
+            .context(NvmeDiscoveryFailed)?;
         }
 
         Ok(h.numrec)
@@ -257,7 +261,7 @@ impl Discovery {
         let f = OpenOptions::new()
             .read(true)
             .open(Path::new(&target))
-            .context(FileIoError { filename: target })?;
+            .context(FileIoFailed { filename: target })?;
 
         let count = self.get_discovery_response_page_entries()?;
 
@@ -292,7 +296,7 @@ impl Discovery {
 
         if let Err(e) = ret {
             unsafe { libc::free(buffer) };
-            return Err(NvmeError::DiscoveryError { source: e });
+            return Err(NvmeError::NvmeDiscoveryFailed { source: e });
         }
 
         let hdr = unsafe { &mut *(buffer as *mut NvmfDiscRspPageHdr) };
@@ -352,9 +356,9 @@ impl Discovery {
         let mut file = OpenOptions::new()
             .write(true)
             .open(&path)
-            .context(FileIoError { filename: &target })?;
+            .context(FileIoFailed { filename: &target })?;
         file.write_all(b"1")
-            .context(FileIoError { filename: target })?;
+            .context(FileIoFailed { filename: target })?;
         Ok(())
     }
 
@@ -539,17 +543,17 @@ impl ConnectArgs {
                 .write(true)
                 .read(true)
                 .open(&p)
-                .context(ConnectError {
+                .context(ConnectFailed {
                     filename: NVME_FABRICS_PATH,
                 })?;
         if let Err(e) = file.write_all(format!("{}", self).as_bytes()) {
             return match e.kind() {
                 ErrorKind::AlreadyExists => Err(NvmeError::ConnectInProgress),
-                _ => Err(NvmeError::IoError { source: e }),
+                _ => Err(NvmeError::IoFailed { source: e }),
             };
         }
         let mut buf = String::new();
-        file.read_to_string(&mut buf).context(ConnectError {
+        file.read_to_string(&mut buf).context(ConnectFailed {
             filename: NVME_FABRICS_PATH,
         })?;
         Ok(buf)

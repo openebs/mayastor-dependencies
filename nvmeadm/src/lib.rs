@@ -36,7 +36,7 @@ mod nvme_page;
 pub mod nvmf_discovery;
 pub mod nvmf_subsystem;
 
-use error::{IoError, NvmeError};
+use error::{nvme_error, NvmeError};
 use snafu::ResultExt;
 mod nvme_uri;
 
@@ -53,12 +53,12 @@ where
     T::Err: ToString,
 {
     let path = dir.join(file);
-    let s = fs::read_to_string(&path).context(IoError {})?;
+    let s = fs::read_to_string(&path).context(nvme_error::IoFailed {})?;
     let s = s.trim();
 
     match s.parse() {
         Ok(v) => Ok(v),
-        Err(e) => Err(NvmeError::ValueParseError {
+        Err(e) => Err(NvmeError::ValueParseFailed {
             path: path.as_path().to_str().unwrap().to_string(),
             contents: s.to_string(),
             error: e.to_string(),

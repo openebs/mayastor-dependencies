@@ -2,20 +2,20 @@ use snafu::Snafu;
 
 #[derive(Debug, Snafu)]
 #[allow(missing_docs)]
-#[snafu(visibility = "pub(crate)")]
+#[snafu(visibility(pub(crate)), context(suffix(false)), module(nvme_error))]
 pub enum NvmeError {
     #[snafu(display("IO error:"))]
-    IoError { source: std::io::Error },
+    IoFailed { source: std::io::Error },
     #[snafu(display("Failed to parse {}: {}, {}", path, contents, error))]
-    ValueParseError {
+    ValueParseFailed {
         path: String,
         contents: String,
         error: String,
     },
     #[snafu(display("Failed to parse value"))]
-    ParseError {},
+    ParseFailed {},
     #[snafu(display("File IO error: {}, {}", filename, source))]
-    FileIoError {
+    FileIoFailed {
         filename: String,
         source: std::io::Error,
     },
@@ -26,12 +26,12 @@ pub enum NvmeError {
     #[snafu(display("Connect in progress"))]
     ConnectInProgress,
     #[snafu(display("NVMe connect failed: {}, {}", filename, source))]
-    ConnectError {
+    ConnectFailed {
         source: std::io::Error,
         filename: String,
     },
     #[snafu(display("IO error during NVMe discovery"))]
-    DiscoveryError { source: nix::Error },
+    NvmeDiscoveryFailed { source: nix::Error },
     #[snafu(display("Controller with nqn: {} not found", text))]
     CtlNotFound { text: String },
     #[snafu(display("Invalid path {}: {}", path, source))]
@@ -40,20 +40,20 @@ pub enum NvmeError {
         path: String,
     },
     #[snafu(display("NVMe subsystems error: {}, {}", path_prefix, source))]
-    SubSysError {
+    SubsystemFailure {
         source: glob::PatternError,
         path_prefix: String,
     },
     #[snafu(display("NVMe URI invalid: {}", source))]
-    UrlError { source: url::ParseError },
+    InvalidUri { source: url::ParseError },
     #[snafu(display("Transport type {} not supported", trtype))]
-    TransportError { trtype: String },
+    TransportNotSupported { trtype: String },
     #[snafu(display("Invalid parameter: {}", text))]
     InvalidParam { text: String },
 }
 
 impl From<std::io::Error> for NvmeError {
     fn from(source: std::io::Error) -> NvmeError {
-        NvmeError::IoError { source }
+        NvmeError::IoFailed { source }
     }
 }

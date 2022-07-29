@@ -5,7 +5,7 @@ authors = ["Jeffry Molanus <jeffry.molanus@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-snafu = "0.6.10"
+snafu = "0.7.1"
 udev = "0.6.2"
 url = "2.2.2"
 uuid = { version = "0.8.2", features = ["v4"] }
