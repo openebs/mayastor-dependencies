@@ -13,6 +13,6 @@ libc = "0.2.99"
 nix = "0.22.1"
 num-traits = "0.2.14"
 once_cell = "1.8.0"
-snafu = "0.6.10"
+snafu = "0.7.1"
 uuid = { version = "0.8.2", features = ["v4"] }
 url = "2.2.2"

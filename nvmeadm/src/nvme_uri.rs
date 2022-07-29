@@ -26,11 +26,11 @@ impl TryFrom<&str> for NvmeTarget {
     type Error = NvmeError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let url = Url::parse(value).map_err(|source| NvmeError::UrlError { source })?;
+        let url = Url::parse(value).map_err(|source| NvmeError::InvalidUri { source })?;
 
         let trtype = match url.scheme() {
             "nvmf" | "nvmf+tcp" => Ok("tcp"),
-            _ => Err(NvmeError::UrlError {
+            _ => Err(NvmeError::InvalidUri {
                 source: ParseError::IdnaError,
             }),
         }?
@@ -38,19 +38,19 @@ impl TryFrom<&str> for NvmeTarget {
 
         let host = url
             .host_str()
-            .ok_or(NvmeError::UrlError {
+            .ok_or(NvmeError::InvalidUri {
                 source: ParseError::EmptyHost,
             })?
             .into();
 
         let subnqn = match url.path_segments() {
-            None => Err(NvmeError::UrlError {
+            None => Err(NvmeError::InvalidUri {
                 source: ParseError::RelativeUrlWithCannotBeABaseBase,
             }),
             Some(s) => {
                 let segments = s.collect::<Vec<&str>>();
                 if segments[0].is_empty() {
-                    Err(NvmeError::UrlError {
+                    Err(NvmeError::InvalidUri {
                         source: ParseError::RelativeUrlWithCannotBeABaseBase,
                     })
                 } else {
@@ -71,7 +71,7 @@ impl TryFrom<&str> for NvmeTarget {
 impl NvmeTarget {
     pub fn connect(&self) -> Result<Vec<NvmeDevice>, NvmeError> {
         if self.trtype != "tcp" {
-            return Err(NvmeError::TransportError {
+            return Err(NvmeError::TransportNotSupported {
                 trtype: self.trtype.clone(),
             });
         }
@@ -81,7 +81,7 @@ impl NvmeTarget {
             .trsvcid(self.port.to_string())
             .nqn(&self.subsysnqn)
             .build()
-            .map_err(|_| NvmeError::ParseError {})?
+            .map_err(|_| NvmeError::ParseFailed {})?
             .connect()?;
 
         let mut retries = 10;
