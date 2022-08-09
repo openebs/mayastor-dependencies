@@ -33,9 +33,6 @@ use bollard::{
 };
 use futures::future::try_join_all;
 
-#[cfg(feature = "rpc")]
-use crate::rpc::RpcHandle;
-
 /// Converts a vector of Strings into vector of OsStrings.
 fn into_os_strs(v: &[String]) -> Vec<OsString> {
     v.iter().map(OsString::from).collect()
@@ -1670,40 +1667,6 @@ impl ComposeTest {
     pub async fn thaw(&self, name: &str) -> Result<(), Error> {
         let id = self.containers.get(name).unwrap();
         self.docker.unpause_container(id.0.as_str()).await
-    }
-
-    /// return grpc handles to the containers
-    #[cfg(feature = "rpc")]
-    pub async fn grpc_handles(&self) -> Result<Vec<RpcHandle>, String> {
-        let mut handles = Vec::new();
-        for v in &self.containers {
-            handles.push(
-                RpcHandle::connect(
-                    v.0.clone(),
-                    format!("{}:10124", v.1 .1)
-                        .parse::<std::net::SocketAddr>()
-                        .unwrap(),
-                )
-                .await?,
-            );
-        }
-
-        Ok(handles)
-    }
-
-    /// return grpc handle to the container
-    #[cfg(feature = "rpc")]
-    pub async fn grpc_handle(&self, name: &str) -> Result<RpcHandle, String> {
-        match self.containers.iter().find(|&c| c.0 == name) {
-            Some(container) => Ok(RpcHandle::connect(
-                container.0.clone(),
-                format!("{}:10124", container.1 .1)
-                    .parse::<std::net::SocketAddr>()
-                    .unwrap(),
-            )
-            .await?),
-            None => Err(format!("Container {} not found!", name)),
-        }
     }
 
     /// explicitly remove all containers
