@@ -83,10 +83,14 @@ pub struct Binary {
 impl Binary {
     /// Setup local binary from target debug and arguments
     pub fn from_dbg(name: &str) -> Self {
+        Self::from_build_type("debug", name)
+    }
+    /// Setup local binary from target for the given build type.
+    pub fn from_build_type(build_type: &str, name: &str) -> Self {
         let project_root = PROJECT_ROOT.get().expect("Project root is not initialized");
         let mut path = project_root.clone();
         path.push("target");
-        path.push("debug");
+        path.push(build_type);
         path.push(name);
         Self::new(&path, vec![])
     }
@@ -645,6 +649,14 @@ impl Builder {
         self.add_container_spec(ContainerSpec::from_binary(
             name,
             Binary::from_path("io-engine"),
+        ))
+    }
+
+    /// add a debug io-engine container with a name
+    pub fn add_container_dbg(self, name: &str) -> Builder {
+        self.add_container_spec(ContainerSpec::from_binary(
+            name,
+            Binary::from_dbg("io-engine"),
         ))
     }
 
