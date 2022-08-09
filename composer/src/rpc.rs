@@ -1,6 +1,9 @@
 #![cfg(feature = "rpc")]
 
-use mayastor::{bdev_rpc_client::BdevRpcClient, mayastor_client::MayastorClient};
+use mayastor::{
+    bdev_rpc_client::BdevRpcClient, json_rpc_client::JsonRpcClient, mayastor_client::MayastorClient,
+};
+
 use std::{
     net::{SocketAddr, TcpStream},
     thread,
@@ -9,6 +12,7 @@ use std::{
 use tonic::transport::Channel;
 
 pub mod mayastor {
+    #![allow(unknown_lints)]
     #![allow(clippy::derive_partial_eq_without_eq)]
     include!(concat!(env!("OUT_DIR"), "/mayastor.rs"));
 }
@@ -19,6 +23,7 @@ pub struct RpcHandle {
     pub endpoint: SocketAddr,
     pub mayastor: MayastorClient<Channel>,
     pub bdev: BdevRpcClient<Channel>,
+    pub jsonrpc: JsonRpcClient<Channel>,
 }
 
 impl RpcHandle {
@@ -43,12 +48,16 @@ impl RpcHandle {
         let bdev = BdevRpcClient::connect(format!("http://{}", endpoint))
             .await
             .unwrap();
+        let jsonrpc = JsonRpcClient::connect(format!("http://{}", endpoint))
+            .await
+            .unwrap();
 
         Ok(Self {
             name,
+            endpoint,
             mayastor,
             bdev,
-            endpoint,
+            jsonrpc,
         })
     }
 }
