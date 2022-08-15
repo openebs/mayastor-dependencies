@@ -4,6 +4,6 @@ set -euo pipefail
 
 for d in `find -maxdepth 2 -name Cargo.toml -printf '%h\n' | grep -v "^./h2"`; do
     pushd $d
-    cargo fmt --all
+    cargo-fmt --all -- --check
     popd
 done

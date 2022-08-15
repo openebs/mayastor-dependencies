@@ -6,12 +6,16 @@ let
   };
   rust = import sources.nixpkgs { overlays = [ (import sources.rust-overlay) ]; };
 in
+let
+  rust-bin =
+    (rust.rust-bin.${profile}.${date}.default.override {
+      extensions = [ "rust-src" ];
+    });
+in
 with pkgs;
 pkgs.mkShell {
   buildInputs = [
-    (rust.rust-bin.${profile}.${date}.default.override {
-      extensions = [ "rust-src" ];
-    })
+    rust-bin
     cargo-udeps
     clang
     openssl
