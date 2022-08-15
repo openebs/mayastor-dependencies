@@ -12,21 +12,21 @@ repos:
     -   id: rust-lint
         name: Rust lint
         description: Run cargo clippy on files included in the commit. clippy should be installed before-hand.
-        entry: ./scripts/rust/linter.sh
+        entry: nix-shell --pure --run ./scripts/rust/linter.sh
         pass_filenames: false
         types: [file, rust]
         language: system
     -   id: rust-style
         name: Rust style
         description: Run cargo fmt on files included in the commit. rustfmt should be installed before-hand.
-        entry: ./scripts/rust/style.sh
-        pass_filenames: true
+        entry: nix-shell --pure --run ./scripts/rust/style.sh
+        pass_filenames: false
         types: [file, rust]
         language: system
     -   id: commit-lint
         name: Commit Lint
         description: Runs commitlint against the commit message.
         language: system
-        entry: bash -c "npm install @commitlint/config-conventional @commitlint/cli; cat $1 | npx commitlint"
+        entry: bash -c 'nix-shell --pure --run "cat $1 | commitlint"'
         args: [$1]
         stages: [commit-msg]

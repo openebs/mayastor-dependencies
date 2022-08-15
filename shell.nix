@@ -20,12 +20,14 @@ pkgs.mkShell {
     protobuf
     udev
     util-linux
-    nodejs
+    commitlint
+    git
   ];
 
   LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
   PROTOC = "${protobuf}/bin/protoc";
   PROTOC_INCLUDE = "${protobuf}/include";
+  NODE_PATH = "${nodePackages."@commitlint/config-conventional"}/lib/node_modules";
 
   shellHook = ''
     pre-commit install
