@@ -7,6 +7,8 @@ use glob::glob;
 use snafu::ResultExt;
 use std::{fs::OpenOptions, io::Write, path::Path, str::FromStr};
 
+pub const SYSFS_NVME_CTRLR_PREFIX: &str = "/sys/devices/virtual/nvme-fabrics/ctl";
+
 /// Subsystem struct shows us all the connect fabrics. This does not include
 /// NVMe devices that are connected by trtype=PCIe
 #[derive(Default, Clone, Debug)]
@@ -34,7 +36,7 @@ impl Subsystem {
     /// that does not contain a value that is being read in the implementation
     pub fn new(source: &Path) -> Result<Self, NvmeError> {
         let name = source
-            .strip_prefix("/sys/devices/virtual/nvme-fabrics/ctl")
+            .strip_prefix(SYSFS_NVME_CTRLR_PREFIX)
             .context(InvalidPath {
                 path: format!("{:?}", source),
             })?
