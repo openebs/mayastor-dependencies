@@ -27,6 +27,7 @@ use once_cell::sync::OnceCell;
 use bollard::{
     auth::DockerCredentials,
     container::KillContainerOptions,
+    exec::{CreateExecOptions, StartExecResults},
     image::CreateImageOptions,
     models::{ContainerCreateResponse, ContainerInspectResponse},
     network::DisconnectNetworkOptions,
@@ -1674,7 +1675,38 @@ impl ComposeTest {
         self.remove_all().await.unwrap();
     }
 
+    /// Get the network label prefix.
     pub fn label_prefix(&self) -> String {
         format!("{}.name", self.label_prefix)
+    }
+
+    /// Run command in container and get the output as a String.
+    pub async fn exec<T: Into<String>>(
+        &self,
+        name: &str,
+        command: Vec<T>,
+    ) -> Result<String, Error> {
+        let exec = self
+            .docker
+            .create_exec(
+                name,
+                CreateExecOptions {
+                    cmd: Some(command.into_iter().map(Into::into).collect()),
+                    attach_stderr: Some(true),
+                    attach_stdout: Some(true),
+                    ..Default::default()
+                },
+            )
+            .await?;
+
+        let mut response = String::new();
+        if let StartExecResults::Attached { mut output, .. } =
+            self.docker.start_exec(&exec.id, None).await?
+        {
+            while let Some(Ok(msg)) = output.next().await {
+                response.push_str(msg.to_string().as_str());
+            }
+        }
+        Ok(response)
     }
 }
