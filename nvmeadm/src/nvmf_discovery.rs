@@ -20,7 +20,7 @@ use snafu::ResultExt;
 use crate::{
     error,
     nvme_page::{NvmeAdminCmd, NvmfDiscRspPageEntry, NvmfDiscRspPageHdr},
-    nvmf_subsystem::{NvmeSubsystems, Subsystem},
+    nvmf_subsystem::{NvmeSubsystems, Subsystem, SYSFS_NVME_CTRLR_PREFIX},
     NVME_ADMIN_CMD_IOCTL, NVME_FABRICS_PATH,
 };
 
@@ -409,7 +409,7 @@ impl Discovery {
     ///  let result = discovered_targets.connect("mynqn");
     /// ```
     ///
-    pub fn connect(&mut self, nqn: &str) -> Result<String, NvmeError> {
+    pub fn connect(&mut self, nqn: &str) -> Result<Subsystem, NvmeError> {
         if let Some(ss) = self.entries.iter_mut().find(|p| p.subnqn == nqn) {
             match ConnectArgs::try_from(ss.clone()) {
                 Ok(c) => c.connect(),
@@ -420,6 +420,63 @@ impl Discovery {
         } else {
             Err(NvmeError::NqnNotFound { text: nqn.into() })
         }
+    }
+}
+
+impl FromStr for Subsystem {
+    type Err = NvmeError;
+
+    /// Connection string has the following format: instance=X,cntlid=Y.
+    /// We translate string data into a valid NVMe subsystem.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts = s.split(',').collect::<Vec<&str>>();
+
+        // Split connection string into tokens and parse every token.
+        for p in parts {
+            let tokens = p.split('=').collect::<Vec<&str>>();
+
+            if tokens.len() != 2 {
+                return Err(NvmeError::ValueParseFailed {
+                    path: s.to_string(),
+                    contents: p.to_string(),
+                    error: "Invalid connection string".to_string(),
+                });
+            }
+
+            match tokens[0] {
+                "instance" => {
+                    match tokens[1].parse::<u64>() {
+                        Ok(id) => {
+                            // Build a subsystem object.
+                            let filename = format!("{}/nvme{}", SYSFS_NVME_CTRLR_PREFIX, id);
+                            let path = Path::new(&filename);
+                            return Subsystem::new(path);
+                        }
+                        Err(_) => {
+                            return Err(NvmeError::ValueParseFailed {
+                                path: s.to_string(),
+                                contents: tokens[1].to_string(),
+                                error: "Invalid controller instance identifier".to_string(),
+                            });
+                        }
+                    }
+                }
+                "cntlid" => {} // Not used as of now, just to validate token name.
+                _ => {
+                    return Err(NvmeError::ValueParseFailed {
+                        path: s.to_string(),
+                        contents: tokens[0].to_string(),
+                        error: "Unknown connection string token".to_string(),
+                    });
+                }
+            }
+        }
+
+        Err(NvmeError::ValueParseFailed {
+            path: s.to_string(),
+            contents: s.to_string(),
+            error: "Invalid connection string".to_string(),
+        })
     }
 }
 
@@ -535,7 +592,7 @@ impl ConnectArgs {
     ///      .connect();
     /// ```
     ///
-    pub fn connect(&self) -> Result<String, NvmeError> {
+    pub fn connect(&self) -> Result<Subsystem, NvmeError> {
         let p = Path::new(NVME_FABRICS_PATH);
 
         let mut file =
@@ -556,7 +613,7 @@ impl ConnectArgs {
         file.read_to_string(&mut buf).context(ConnectFailed {
             filename: NVME_FABRICS_PATH,
         })?;
-        Ok(buf)
+        buf.parse::<Subsystem>()
     }
 }
 
