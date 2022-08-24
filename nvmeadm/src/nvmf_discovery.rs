@@ -20,7 +20,7 @@ use snafu::ResultExt;
 use crate::{
     error,
     nvme_page::{NvmeAdminCmd, NvmfDiscRspPageEntry, NvmfDiscRspPageHdr},
-    nvmf_subsystem::{NvmeSubsystems, Subsystem},
+    nvmf_subsystem::{NvmeSubsystems, Subsystem, SYSFS_NVME_CTRLR_PREFIX},
     NVME_ADMIN_CMD_IOCTL, NVME_FABRICS_PATH,
 };
 
@@ -409,7 +409,7 @@ impl Discovery {
     ///  let result = discovered_targets.connect("mynqn");
     /// ```
     ///
-    pub fn connect(&mut self, nqn: &str) -> Result<String, NvmeError> {
+    pub fn connect(&mut self, nqn: &str) -> Result<NvmfConnection, NvmeError> {
         if let Some(ss) = self.entries.iter_mut().find(|p| p.subnqn == nqn) {
             match ConnectArgs::try_from(ss.clone()) {
                 Ok(c) => c.connect(),
@@ -420,6 +420,88 @@ impl Discovery {
         } else {
             Err(NvmeError::NqnNotFound { text: nqn.into() })
         }
+    }
+}
+
+/// Object that represents a successfully opened connection to NVMf target.
+#[derive(Debug)]
+pub struct NvmfConnection {
+    ctrlr: String,
+}
+
+impl NvmfConnection {
+    /// Get name of the NVMe controller that represents the connection.
+    pub fn controller_name(&self) -> &str {
+        &self.ctrlr
+    }
+
+    /// Get a subsystem that represents this NVMf connection.
+    pub fn get_subsystem(&self) -> Result<Subsystem, NvmeError> {
+        let filename = format!("{}/{}", SYSFS_NVME_CTRLR_PREFIX, self.ctrlr);
+        let path = Path::new(&filename);
+
+        Subsystem::new(path)
+    }
+}
+
+impl FromStr for NvmfConnection {
+    type Err = NvmeError;
+
+    /// Parse connection string into a high-level NvmfConnection object.
+    /// Connection string has the following format: instance=X,cntlid=Y.
+    /// We translate string data into a valid NVMe controller.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts = s.split(',').collect::<Vec<&str>>();
+
+        let mut res = None;
+
+        // Split connection string into tokens and parse every token.
+        for p in parts {
+            let tokens = p.split('=').collect::<Vec<&str>>();
+
+            if tokens.len() != 2 {
+                return Err(NvmeError::ValueParseFailed {
+                    path: s.to_string(),
+                    contents: p.to_string(),
+                    error: "Invalid connection string".to_string(),
+                });
+            }
+
+            match tokens[0] {
+                "instance" => {
+                    match tokens[1].parse::<u64>() {
+                        Ok(id) => {
+                            // Get a valid controller id, build a connection object.
+                            res = Some(Self {
+                                ctrlr: format!("nvme{}", id),
+                            });
+                            break;
+                        }
+                        Err(_) => {
+                            return Err(NvmeError::ValueParseFailed {
+                                path: s.to_string(),
+                                contents: tokens[1].to_string(),
+                                error: "Invalid controller instance identifier".to_string(),
+                            });
+                        }
+                    }
+                }
+                "cntlid" => {} // Not used as of now, just to validate token name.
+                _ => {
+                    return Err(NvmeError::ValueParseFailed {
+                        path: s.to_string(),
+                        contents: tokens[0].to_string(),
+                        error: "Unknown connection string token".to_string(),
+                    });
+                }
+            }
+        }
+
+        res.ok_or_else(|| NvmeError::ValueParseFailed {
+            path: s.to_string(),
+            contents: s.to_string(),
+            error: "Invalid connection string".to_string(),
+        })
     }
 }
 
@@ -535,7 +617,7 @@ impl ConnectArgs {
     ///      .connect();
     /// ```
     ///
-    pub fn connect(&self) -> Result<String, NvmeError> {
+    pub fn connect(&self) -> Result<NvmfConnection, NvmeError> {
         let p = Path::new(NVME_FABRICS_PATH);
 
         let mut file =
@@ -556,7 +638,7 @@ impl ConnectArgs {
         file.read_to_string(&mut buf).context(ConnectFailed {
             filename: NVME_FABRICS_PATH,
         })?;
-        Ok(buf)
+        buf.parse::<NvmfConnection>()
     }
 }
 

@@ -13,13 +13,7 @@ use std::{
 static CONFIG_TEXT: &str = "nexus_opts:
   nvmf_nexus_port: 4422
   nvmf_replica_port: NVMF_PORT
-  iscsi_enable: false
-nvmf_tcp_tgt_conf:
-  max_namespaces: 2
-# although not used we still have to reduce mem requirements for iSCSI
-iscsi_tgt_conf:
-  max_sessions: 1
-  max_connections_per_session: 1
+  nvmf_enable: true
 ";
 
 const CONFIG_FILE: &str = "/tmp/nvmeadm_nvmf_target.yaml";
@@ -191,6 +185,13 @@ fn disconnect_test() {
 
 #[test]
 fn test_against_real_target() {
+    // Disconnect all pre-existing NVMe connections to make sure new controller
+    // always gets id = 0.
+    let _nvme_disconnect = Command::new("nvme")
+        .arg("disconnect-all")
+        .spawn()
+        .expect("Failed to cleanup NVMe connections !");
+
     // Start an SPDK-based nvmf target
     let _target = NvmfTarget::new(CONFIG_FILE, &TARGET_PORT.to_string());
 
@@ -210,9 +211,23 @@ fn test_against_real_target() {
         .expect_err("Should NOT be able to connect to invalid target");
 
     // Check that we CAN connect to an NQN that is served
-    let _expect_to_connect = explorer
+    let conn = explorer
         .connect(SERVED_DISK_NQN)
         .expect("Problem connecting to valid target");
+
+    // Since there are no other NVMe controllers exist, our controller
+    // must be nvme0.
+    assert_eq!(conn.controller_name(), "nvme0");
+
+    // Make sure we can obtain NVMe subsystem for this new connection.
+    let subsystem = conn
+        .get_subsystem()
+        .expect("Can't get NVMe subsystem for connection");
+
+    // Make sure subsystem represents the same controller object and is live.
+    assert_eq!(subsystem.name, "nvme0");
+    assert_eq!(subsystem.instance, 0);
+    assert_eq!(subsystem.state, "live");
 
     // allow the part scan to complete for most cases
     std::thread::sleep(std::time::Duration::from_secs(1));
