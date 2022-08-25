@@ -211,7 +211,7 @@ fn test_against_real_target() {
         .expect_err("Should NOT be able to connect to invalid target");
 
     // Check that we CAN connect to an NQN that is served
-    let subsystem = explorer
+    let mut subsystem = explorer
         .connect(SERVED_DISK_NQN)
         .expect("Problem connecting to valid target");
 
@@ -220,6 +220,10 @@ fn test_against_real_target() {
     // Make sure subsystem represents the same controller object and is live.
     assert_eq!(subsystem.name, "nvme0");
     assert_eq!(subsystem.instance, 0);
+    assert_eq!(subsystem.state, "live");
+
+    // Should be able to sync the subsystem.
+    subsystem.sync().expect("Failed to sync subsystem's state");
     assert_eq!(subsystem.state, "live");
 
     // allow the part scan to complete for most cases

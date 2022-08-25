@@ -71,6 +71,17 @@ impl Subsystem {
             model,
         })
     }
+    /// Synchronize in-memory state of this subsystem with system's state.
+    /// The folowing is updated: state
+    pub fn sync(&mut self) -> Result<(), NvmeError> {
+        let filename = format!("{}/{}", SYSFS_NVME_CTRLR_PREFIX, self.name);
+        let path = Path::new(&filename);
+        let state = parse_value::<String>(path, "state")?;
+
+        self.state = state;
+        Ok(())
+    }
+
     /// issue a rescan to the controller to find new namespaces
     pub fn rescan(&self) -> Result<(), NvmeError> {
         let filename = format!("/sys/class/nvme/{}/rescan_controller", self.name);
