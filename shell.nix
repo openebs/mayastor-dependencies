@@ -16,6 +16,7 @@ with pkgs;
 pkgs.mkShell {
   buildInputs = [
     rust-bin
+    cacert
     cargo-udeps
     clang
     openssl
