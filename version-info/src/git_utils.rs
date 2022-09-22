@@ -5,13 +5,26 @@ use regex::Regex;
 /// or just commit hash in the case no tags found.
 /// See `git describe` manual for details.
 pub fn long_raw_version_str() -> &'static str {
-    git_version::git_version!(args = ["--abbrev=12", "--always", "--long"])
+    // to keep clippy happy
+    #[allow(dead_code)]
+    fn fallback() -> &'static str {
+        option_env!("GIT_VERSION_LONG").expect("git version fallback")
+    }
+    git_version::git_version!(
+        args = ["--abbrev=12", "--always", "--long"],
+        fallback = fallback()
+    )
 }
 
 /// Returns the git version as &'static str.
 /// See `git describe` manual for details.
 pub fn raw_version_str() -> &'static str {
-    git_version::git_version!(args = ["--abbrev=12", "--always"])
+    // to keep clippy happy
+    #[allow(dead_code)]
+    fn fallback() -> &'static str {
+        option_env!("GIT_VERSION").expect("git version fallback")
+    }
+    git_version::git_version!(args = ["--abbrev=12", "--always"], fallback = fallback())
 }
 
 /// Returns the git version as String.
