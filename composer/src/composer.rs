@@ -1685,7 +1685,7 @@ impl ComposeTest {
         &self,
         name: &str,
         command: Vec<T>,
-    ) -> Result<String, Error> {
+    ) -> Result<(Option<i64>, String), Error> {
         let exec = self
             .docker
             .create_exec(
@@ -1707,6 +1707,7 @@ impl ComposeTest {
                 response.push_str(msg.to_string().as_str());
             }
         }
-        Ok(response)
+        let exit_code = self.docker.inspect_exec(&exec.id).await?.exit_code;
+        Ok((exit_code, response))
     }
 }
