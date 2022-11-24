@@ -519,6 +519,8 @@ pub struct ConnectArgs {
     keep_alive_tmo: Option<u32>,
     #[builder(default = "None")]
     nr_io_queues: Option<u32>,
+    #[builder(default = "None")]
+    hostnqn: Option<String>,
 }
 
 impl ConnectArgsBuilder {
@@ -547,7 +549,11 @@ impl fmt::Display for ConnectArgs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let host_id = HOST_ID.as_str();
         write!(f, "nqn={},", self.nqn)?;
-        write!(f, "hostnqn=nqn.2019-05.io.openebs.engine:{},", host_id)?;
+        if let Some(val) = &self.hostnqn {
+            write!(f, "hostnqn={},", val)?;
+        } else {
+            write!(f, "hostnqn=nqn.2019-05.io.openebs.engine:{},", host_id)?;
+        }
         write!(f, "hostid={},", host_id)?;
         write!(f, "transport={},", self.transport)?;
         write!(f, "traddr={},", self.traddr)?;
