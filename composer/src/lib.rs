@@ -1,5 +1,6 @@
 mod composer;
 
 pub use crate::composer::{
-    initialize, Binary, Builder, BuilderConfigure, ComposeTest, ContainerSpec, ImagePullPolicy,
+    initialize, set_secondary_target_dir, Binary, Builder, BuilderConfigure, ComposeTest,
+    ContainerSpec, ImagePullPolicy,
 };
