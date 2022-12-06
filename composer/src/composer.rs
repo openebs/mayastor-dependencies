@@ -44,6 +44,7 @@ pub const TEST_LABEL_PREFIX: &str = "io.composer.test";
 pub const TEST_NET_NETWORK: &str = "10.1.0.0/16";
 
 static PROJECT_ROOT: OnceCell<PathBuf> = OnceCell::new();
+static PROJECT_TARGET_DIR: OnceCell<Option<OsString>> = OnceCell::new();
 
 /// Initialize the composer with target project root.
 /// Must be called before any Binary object is constructed.
@@ -67,6 +68,15 @@ pub fn initialize<T: AsRef<Path>>(project_root: T) {
     }
 }
 
+/// Sets a second level target, for the case when the build target is explicitly specified.
+pub fn set_secondary_target_dir<T: AsRef<OsStr>>(tgt_dir: Option<T>) {
+    tracing::trace!(
+        "Project target directory set to {:?}",
+        tgt_dir.as_ref().map(|s| s.as_ref().to_str().unwrap())
+    );
+    PROJECT_TARGET_DIR.get_or_init(|| tgt_dir.map(|s| OsString::from(s.as_ref())));
+}
+
 /// Path to local binary and arguments
 #[derive(Default, Clone)]
 pub struct Binary {
@@ -88,6 +98,11 @@ impl Binary {
         let project_root = PROJECT_ROOT.get().expect("Project root is not initialized");
         let mut path = project_root.clone();
         path.push("target");
+
+        if let Some(Some(tgt_dir)) = PROJECT_TARGET_DIR.get() {
+            path.push(tgt_dir);
+        }
+
         path.push(build_type);
         path.push(name);
         Self::new(&path, vec![])
