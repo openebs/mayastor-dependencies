@@ -14,3 +14,6 @@ Cargo.lock
 /package-lock.json
 /package.json
 /rust-git-version
+
+# Directory for pre-generated files to be used by non-Linux IDEs.
+.pregenerated
