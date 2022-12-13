@@ -10,30 +10,58 @@ use std::{fs::OpenOptions, io::Write, path::Path, str::FromStr};
 pub const SYSFS_NVME_CTRLR_PREFIX: &str = "/sys/devices/virtual/nvme-fabrics/ctl";
 
 /// Subsystem struct shows us all the connect fabrics. This does not include
-/// NVMe devices that are connected by trtype=PCIe
+/// NVMe devices that are connected by trtype=PCIe.
 #[derive(Default, Clone, Debug)]
 pub struct Subsystem {
-    /// name of the subsystem
+    /// Name of the subsystem.
     pub name: String,
-    /// instance number of the subsystem (controller)
+    /// Instance number of the subsystem (controller).
     pub instance: u32,
-    /// NVme Qualified Name (NQN)
+    /// NVme Qualified Name (NQN).
     pub nqn: String,
-    /// state of the connection, will contain live if online
+    /// State of the connection, will contain live if online.
     pub state: String,
-    /// the transport type being used (tcp or RDMA)
+    /// The transport type being used (tcp or RDMA).
     pub transport: String,
-    /// address contains traddr=X,trsvcid=Y
+    /// Address contains traddr=X,trsvcid=Y.
     pub address: String,
-    /// serial number
+    /// Serial number.
     pub serial: String,
-    /// model number
+    /// Model number.
     pub model: String,
 }
 
+/// Wrapper structure that creates subsystem addr string.
+pub struct SubsystemAddr(String);
+
+impl SubsystemAddr {
+    /// New SubsystemAddr.
+    pub fn new(host: String, port: u16) -> SubsystemAddr {
+        SubsystemAddr(format!("traddr={},trsvcid={}", host, port))
+    }
+    /// SubsystemAddr content as slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+// For SubsystemAddr == String comparisons
+impl PartialEq<String> for SubsystemAddr {
+    fn eq(&self, other: &String) -> bool {
+        self.as_str() == other
+    }
+}
+
+// For String == SubsystemAddr comparisons
+impl PartialEq<SubsystemAddr> for String {
+    fn eq(&self, other: &SubsystemAddr) -> bool {
+        self == other.as_str()
+    }
+}
+
 impl Subsystem {
-    /// scans the sysfs directory for attached subsystems skips any transport
-    /// that does not contain a value that is being read in the implementation
+    /// Scans the sysfs directory for attached subsystems skips any transport
+    /// that does not contain a value that is being read in the implementation.
     pub fn new(source: &Path) -> Result<Self, NvmeError> {
         let name = source
             .strip_prefix(SYSFS_NVME_CTRLR_PREFIX)
@@ -82,7 +110,7 @@ impl Subsystem {
         Ok(())
     }
 
-    /// issue a rescan to the controller to find new namespaces
+    /// Issue a rescan to the controller to find new namespaces.
     pub fn rescan(&self) -> Result<(), NvmeError> {
         let filename = format!("/sys/class/nvme/{}/rescan_controller", self.name);
         let path = Path::new(&filename);
@@ -96,7 +124,7 @@ impl Subsystem {
         file.write_all(b"1").context(FileIoFailed { filename })?;
         Ok(())
     }
-    /// disconnects the transport dropping all namespaces
+    /// Disconnects the transport dropping all namespaces.
     pub fn disconnect(&self) -> Result<(), NvmeError> {
         let filename = format!("/sys/class/nvme/{}/delete_controller", self.name);
         let path = Path::new(&filename);
@@ -110,7 +138,7 @@ impl Subsystem {
         file.write_all(b"1").context(FileIoFailed { filename })?;
         Ok(())
     }
-    /// resets the nvme controller
+    /// Resets the nvme controller.
     pub fn reset(&self) -> Result<(), NvmeError> {
         let filename = format!("/sys/class/nvme/{}/reset_controller", self.name);
         let path = Path::new(&filename);
@@ -124,9 +152,29 @@ impl Subsystem {
         file.write_all(b"1").context(FileIoFailed { filename })?;
         Ok(())
     }
+
+    /// Returns the particular subsystem based on the nqn and address.
+    // TODO: Optimize this code.
+    pub fn get(host: &str, port: &u16, nqn: &str) -> Result<Subsystem, NvmeError> {
+        let address = SubsystemAddr::new(host.to_string(), *port);
+
+        let nvme_subsystems = NvmeSubsystems::new()?;
+
+        match nvme_subsystems
+            .flatten()
+            .find(|subsys| subsys.nqn == *nqn && subsys.address == address)
+        {
+            None => Err(NvmeError::SubsystemNotFound {
+                nqn: nqn.to_string(),
+                host: host.to_string(),
+                port: *port,
+            }),
+            Some(subsys) => Ok(subsys),
+        }
+    }
 }
 
-/// list of subsystems found on the system
+/// List of subsystems found on the system.
 #[derive(Default, Debug)]
 pub struct NvmeSubsystems {
     entries: Vec<String>,
@@ -143,14 +191,15 @@ impl Iterator for NvmeSubsystems {
 }
 
 impl NvmeSubsystems {
-    /// Construct a new list of subsystems
+    /// Construct a new list of subsystems.
     pub fn new() -> Result<Self, NvmeError> {
         let path_prefix = "/sys/devices/virtual/nvme-fabrics/ctl/nvme*";
         let path_entries = glob(path_prefix).context(SubsystemFailure { path_prefix })?;
-        let mut entries = Vec::new();
-        for path in path_entries.flatten() {
-            entries.push(path.display().to_string())
-        }
+        let entries = path_entries
+            .flatten()
+            .into_iter()
+            .map(|p| p.display().to_string())
+            .collect();
         Ok(NvmeSubsystems { entries })
     }
 }
