@@ -34,6 +34,8 @@ pub enum NvmeError {
         host: String,
         port: u16,
     },
+    #[snafu(display("No Nvmf Subsystem found for nqn :{}", nqn))]
+    NoSubsytemFound { nqn: String },
     #[snafu(display("Connect in progress"))]
     ConnectInProgress,
     #[snafu(display("NVMe connect failed: {}, {}", filename, source))]
