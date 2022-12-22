@@ -1,12 +1,12 @@
 use std::{convert::TryFrom, iter::Iterator};
+#[cfg(target_os = "linux")]
 use udev::Enumerator;
 use url::Url;
 use uuid::Uuid;
 
-use crate::{
-    DevInfoError,
-    DevInfoError::{NqnInvalid, Udev},
-};
+#[cfg(target_os = "linux")]
+use crate::DevInfoError::Udev;
+use crate::{DevInfoError, DevInfoError::NqnInvalid};
 
 pub(crate) type Failable<T, E = DevInfoError> = std::result::Result<T, E>;
 
@@ -71,10 +71,11 @@ impl TryFrom<&str> for BlkDev {
 }
 
 impl BlkDev {
-    /// lookup the device path for this BlkDev. The approach is rather simply,
+    /// Lookup the device path for this BlkDev. The approach is rather simply,
     /// based on the URI's path segment, look for properties that will match
     /// the UUID. Right now we try to match only one property, but an array
     /// of properties could be matched on as well.
+    #[cfg(target_os = "linux")]
     pub fn lookup(&self) -> Failable<String> {
         let mut enumerator = Enumerator::new().map_err(|value| Udev {
             value: value.to_string(),
@@ -107,5 +108,12 @@ impl BlkDev {
 
         // fall through
         Err(DevInfoError::NotFound { path: value })
+    }
+    /// Dummy lookup impl.
+    #[cfg(not(target_os = "linux"))]
+    pub fn lookup(&self) -> Failable<String> {
+        Err(DevInfoError::NotSupported {
+            value: "Non-linux".to_string(),
+        })
     }
 }
