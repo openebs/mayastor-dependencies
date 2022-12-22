@@ -1,4 +1,7 @@
+#[cfg(target_os = "linux")]
 use std::{env, path::PathBuf};
+
+#[cfg(target_os = "linux")]
 fn main() {
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
@@ -13,3 +16,6 @@ fn main() {
 
     println!("cargo:rustc-link-lib=blkid");
 }
+
+#[cfg(not(target_os = "linux"))]
+fn main() {}

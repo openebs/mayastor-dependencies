@@ -7,7 +7,9 @@ pub mod mountinfo;
 pub mod partition;
 
 #[allow(non_camel_case_types)]
+#[cfg(target_os = "linux")]
 pub mod blkid;
+
 #[derive(Debug, Snafu)]
 pub enum DevInfoError {
     #[snafu(display("Device {} not found", path))]
