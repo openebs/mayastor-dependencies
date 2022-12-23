@@ -19,8 +19,8 @@ pub enum NvmeError {
         filename: String,
         source: std::io::Error,
     },
-    #[snafu(display("nqn: {} not found", text))]
-    NqnNotFound { text: String },
+    #[snafu(display("No Nvmf subsystem found for the nqn: {}", nqn))]
+    NqnNotFound { nqn: String },
     #[snafu(display("No nvmf subsystems found"))]
     NoSubsystems,
     #[snafu(display(

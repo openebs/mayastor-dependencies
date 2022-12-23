@@ -172,6 +172,24 @@ impl Subsystem {
             Some(subsys) => Ok(subsys),
         }
     }
+
+    /// Gets all Nvme subsystem registered for a given nqn.
+    pub fn try_from_nqn(nqn: &str) -> Result<Vec<Subsystem>, NvmeError> {
+        let nvme_subsystems = NvmeSubsystems::new()?;
+        let mut nvme_paths = vec![];
+        for path in nvme_subsystems.flatten() {
+            if path.nqn == nqn {
+                nvme_paths.push(path);
+            }
+        }
+        if nvme_paths.is_empty() {
+            Err(NvmeError::NqnNotFound {
+                nqn: nqn.to_string(),
+            })
+        } else {
+            Ok(nvme_paths)
+        }
+    }
 }
 
 /// List of subsystems found on the system.

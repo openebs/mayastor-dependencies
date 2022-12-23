@@ -418,7 +418,7 @@ impl Discovery {
                 }),
             }
         } else {
-            Err(NvmeError::NqnNotFound { text: nqn.into() })
+            Err(NvmeError::NqnNotFound { nqn: nqn.into() })
         }
     }
 }
