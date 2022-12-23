@@ -173,17 +173,17 @@ impl Subsystem {
         }
     }
 
-    /// Gets all Nvme subsystems registered for a given volume.
-    pub fn get_from_nqn(nqn: &str) -> Result<Vec<Subsystem>, NvmeError> {
+    /// Gets all Nvme subsystem registered for a given nqn.
+    pub fn try_from_nqn(nqn: &str) -> Result<Vec<Subsystem>, NvmeError> {
         let nvme_subsystems = NvmeSubsystems::new()?;
         let mut nvme_paths = vec![];
         for path in nvme_subsystems.flatten() {
-            if path.nqn == nqn && (path.state == "live" || path.state == "connecting") {
+            if path.nqn == nqn {
                 nvme_paths.push(path);
             }
         }
-        if !nvme_paths.is_empty() {
-            Err(NvmeError::NoSubsytemFound {
+        if nvme_paths.is_empty() {
+            Err(NvmeError::NqnNotFound {
                 nqn: nqn.to_string(),
             })
         } else {
