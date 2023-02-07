@@ -59,7 +59,7 @@ impl Default for TrType {
 
 impl fmt::Display for TrType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -75,7 +75,7 @@ pub enum AddressFamily {
 
 impl fmt::Display for AddressFamily {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -91,7 +91,7 @@ pub enum SubType {
 /// Check if the string contains a valid tcp port number.
 fn is_valid_port(value: &str) -> Result<(), String> {
     match value.parse::<u16>() {
-        Err(_) => Err(format!("port should be a number: {}", value)),
+        Err(_) => Err(format!("port should be a number: {value}")),
         Ok(_) => Ok(()),
     }
 }
@@ -99,7 +99,7 @@ fn is_valid_port(value: &str) -> Result<(), String> {
 /// Check if the string contains a valid IP address.
 fn is_valid_ip(value: &str) -> Result<(), String> {
     match IpAddr::from_str(value) {
-        Err(_) => Err(format!("invalid IP address: {}", value)),
+        Err(_) => Err(format!("invalid IP address: {value}")),
         Ok(_) => Ok(()),
     }
 }
@@ -148,7 +148,7 @@ pub struct Discovery {
 
 impl fmt::Display for Discovery {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -180,14 +180,13 @@ impl Discovery {
         );
         let p = Path::new(NVME_FABRICS_PATH);
 
-        let mut file =
-            OpenOptions::new()
-                .write(true)
-                .read(true)
-                .open(&p)
-                .context(FileIoFailed {
-                    filename: NVME_FABRICS_PATH,
-                })?;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .read(true)
+            .open(p)
+            .context(FileIoFailed {
+                filename: NVME_FABRICS_PATH,
+            })?;
 
         file.write_all(self.arg_string.as_bytes())
             .context(FileIoFailed {
@@ -355,7 +354,7 @@ impl Discovery {
         let path = Path::new(&target);
         let mut file = OpenOptions::new()
             .write(true)
-            .open(&path)
+            .open(path)
             .context(FileIoFailed { filename: &target })?;
         file.write_all(b"1")
             .context(FileIoFailed { filename: target })?;
@@ -369,8 +368,7 @@ impl Discovery {
             return Err(NvmeError::NoSubsystems {});
         }
         // we are ignoring errors here, and connect to all possible devices
-        if let Err(connections) = self
-            .entries
+        self.entries
             .iter_mut()
             .map(|e| match ConnectArgs::try_from(e.clone()) {
                 Ok(c) => c.connect(),
@@ -378,10 +376,7 @@ impl Discovery {
                     text: err.to_string(),
                 }),
             })
-            .collect::<Result<Vec<_>, _>>()
-        {
-            return Err(connections);
-        }
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(())
     }
 
@@ -448,7 +443,7 @@ impl FromStr for Subsystem {
                     match tokens[1].parse::<u64>() {
                         Ok(id) => {
                             // Build a subsystem object.
-                            let filename = format!("{}/nvme{}", SYSFS_NVME_CTRLR_PREFIX, id);
+                            let filename = format!("{SYSFS_NVME_CTRLR_PREFIX}/nvme{id}");
                             let path = Path::new(&filename);
                             return Subsystem::new(path);
                         }
@@ -537,7 +532,7 @@ impl ConnectArgsBuilder {
                 }
             }
             Some(TrType::rdma) => Ok(()),
-            Some(val) => Err(format!("invalid transport type: {}", val)),
+            Some(val) => Err(format!("invalid transport type: {val}")),
             None => Ok(()), // using the default transport type
         }
     }
@@ -550,25 +545,25 @@ impl fmt::Display for ConnectArgs {
         let host_id = HOST_ID.as_str();
         write!(f, "nqn={},", self.nqn)?;
         if let Some(val) = &self.hostnqn {
-            write!(f, "hostnqn={},", val)?;
+            write!(f, "hostnqn={val},")?;
         } else {
-            write!(f, "hostnqn=nqn.2019-05.io.openebs.engine:{},", host_id)?;
+            write!(f, "hostnqn=nqn.2019-05.io.openebs.engine:{host_id},")?;
         }
-        write!(f, "hostid={},", host_id)?;
+        write!(f, "hostid={host_id},")?;
         write!(f, "transport={},", self.transport)?;
         write!(f, "traddr={},", self.traddr)?;
         write!(f, "trsvcid={}", self.trsvcid)?;
         if let Some(val) = self.keep_alive_tmo {
-            write!(f, ",keep_alive_tmo={}", val)?;
+            write!(f, ",keep_alive_tmo={val}")?;
         }
         if let Some(val) = self.reconnect_delay {
-            write!(f, ",reconnect_delay={}", val)?;
+            write!(f, ",reconnect_delay={val}")?;
         }
         if let Some(val) = self.ctrl_loss_tmo {
-            write!(f, ",ctrl_loss_tmo={}", val)?;
+            write!(f, ",ctrl_loss_tmo={val}")?;
         }
         if let Some(val) = self.nr_io_queues {
-            write!(f, ",nr_io_queues={}", val)?;
+            write!(f, ",nr_io_queues={val}")?;
         }
         Ok(())
     }
@@ -605,11 +600,11 @@ impl ConnectArgs {
             OpenOptions::new()
                 .write(true)
                 .read(true)
-                .open(&p)
+                .open(p)
                 .context(ConnectFailed {
                     filename: NVME_FABRICS_PATH,
                 })?;
-        if let Err(e) = file.write_all(format!("{}", self).as_bytes()) {
+        if let Err(e) = file.write_all(format!("{self}").as_bytes()) {
             return match e.kind() {
                 ErrorKind::AlreadyExists => Err(NvmeError::ConnectInProgress),
                 _ => Err(NvmeError::IoFailed { source: e }),

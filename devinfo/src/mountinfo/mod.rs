@@ -92,12 +92,12 @@ impl MountInfo {
 
     fn fetch_from_disk_by_path(path: &str) -> io::Result<PathBuf> {
         PartitionID::from_disk_by_path(path)
-            .map_err(|why| Error::new(ErrorKind::InvalidData, format!("{}: {}", path, why)))?
+            .map_err(|why| Error::new(ErrorKind::InvalidData, format!("{path}: {why}")))?
             .get_device_path()
             .ok_or_else(|| {
                 Error::new(
                     ErrorKind::NotFound,
-                    format!("device path for {} was not found", path),
+                    format!("device path for {path} was not found"),
                 )
             })
     }
