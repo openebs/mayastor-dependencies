@@ -25,7 +25,7 @@ const TARGET_PORT: u32 = 9523;
 /// Write out a config file, but with the specified port for nvmf
 fn create_config_file(config_file: &str, nvmf_port: &str) {
     let path = Path::new(config_file);
-    let mut config = match File::create(&path) {
+    let mut config = match File::create(path) {
         Err(reason) => {
             panic!("Unable to create {}: {}", path.display(), reason)
         }
@@ -44,7 +44,7 @@ fn create_config_file(config_file: &str, nvmf_port: &str) {
 
 /// Wait for the engine to start up and accept connections on the specified port
 fn wait_for_engine_ready(listening_port: u32) -> Result<(), String> {
-    let dest = format!("127.0.0.1:{}", listening_port);
+    let dest = format!("127.0.0.1:{listening_port}");
     let socket_addr: SocketAddr = dest.parse().expect("Badly formed address");
 
     for _ in 1 .. 20 {
@@ -62,7 +62,7 @@ fn wait_for_engine_ready(listening_port: u32) -> Result<(), String> {
         thread::sleep(Duration::from_millis(100));
     }
 
-    Err(format!("failed to connect to spdk port {}", listening_port))
+    Err(format!("failed to connect to spdk port {listening_port}"))
 }
 
 pub struct NvmfTarget {
@@ -79,7 +79,7 @@ impl NvmfTarget {
                 }
                 match std::str::from_utf8(&output.stderr) {
                     Ok(s) => {
-                        println!("io-engine-client failed: {}", s);
+                        println!("io-engine-client failed: {s}");
                     }
                     Err(_) => {
                         println!("io-engine-client failed");
@@ -87,7 +87,7 @@ impl NvmfTarget {
                 }
             }
             Err(error) => {
-                println!("failed to execute io-engine-client: {}", error);
+                println!("failed to execute io-engine-client: {error}");
             }
         }
         false

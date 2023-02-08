@@ -37,7 +37,7 @@ pub struct SubsystemAddr(String);
 impl SubsystemAddr {
     /// New SubsystemAddr.
     pub fn new(host: String, port: u16) -> SubsystemAddr {
-        SubsystemAddr(format!("traddr={},trsvcid={}", host, port))
+        SubsystemAddr(format!("traddr={host},trsvcid={port}"))
     }
     /// SubsystemAddr content as slice.
     pub fn as_str(&self) -> &str {
@@ -66,7 +66,7 @@ impl Subsystem {
         let name = source
             .strip_prefix(SYSFS_NVME_CTRLR_PREFIX)
             .context(InvalidPath {
-                path: format!("{:?}", source),
+                path: format!("{source:?}"),
             })?
             .display()
             .to_string();
@@ -117,7 +117,7 @@ impl Subsystem {
 
         let mut file = OpenOptions::new()
             .write(true)
-            .open(&path)
+            .open(path)
             .context(FileIoFailed {
                 filename: &filename,
             })?;
@@ -131,7 +131,7 @@ impl Subsystem {
 
         let mut file = OpenOptions::new()
             .write(true)
-            .open(&path)
+            .open(path)
             .context(FileIoFailed {
                 filename: &filename,
             })?;
@@ -145,7 +145,7 @@ impl Subsystem {
 
         let mut file = OpenOptions::new()
             .write(true)
-            .open(&path)
+            .open(path)
             .context(FileIoFailed {
                 filename: &filename,
             })?;
@@ -215,7 +215,6 @@ impl NvmeSubsystems {
         let path_entries = glob(path_prefix).context(SubsystemFailure { path_prefix })?;
         let entries = path_entries
             .flatten()
-            .into_iter()
             .map(|p| p.display().to_string())
             .collect();
         Ok(NvmeSubsystems { entries })

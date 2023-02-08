@@ -126,7 +126,7 @@ impl Binary {
     /// Add environment variables for the container
     pub fn with_env(mut self, key: &str, val: &str) -> Self {
         if let Some(old) = self.env.insert(key.into(), val.into()) {
-            println!("Replaced key {} val {} with val {}", key, old, val);
+            println!("Replaced key {key} val {old} with val {val}");
         }
         self
     }
@@ -150,7 +150,7 @@ impl Binary {
         if let Some(nats_arg) = self.nats_arg.take() {
             if !nats_arg.is_empty() {
                 self.arguments.push(nats_arg);
-                self.arguments.push(format!("nats.{}:4222", network));
+                self.arguments.push(format!("nats.{network}:4222"));
             }
         }
     }
@@ -210,7 +210,7 @@ impl std::str::FromStr for ImagePullPolicy {
         match source.to_ascii_lowercase().as_str() {
             "ifnotpresent" => Ok(Self::IfNotPresent),
             "always" => Ok(Self::Always),
-            _ => Err(format!("Could not parse the ImagePullPolicy: {}", source)),
+            _ => Err(format!("Could not parse the ImagePullPolicy: {source}")),
         }
     }
 }
@@ -291,7 +291,7 @@ impl ContainerSpec {
         let from = if from.contains('/') {
             from.to_string()
         } else {
-            format!("{}/tcp", from)
+            format!("{from}/tcp")
         };
         let binding = bollard::service::PortBinding {
             host_ip: None,
@@ -330,7 +330,7 @@ impl ContainerSpec {
     /// If a key already exists, the value is replaced
     pub fn with_env(mut self, key: &str, val: &str) -> Self {
         if let Some(old) = self.env.insert(key.into(), val.into()) {
-            println!("Replaced key {} val {} with val {}", key, old, val);
+            println!("Replaced key {key} val {old} with val {val}");
         }
         self
     }
@@ -395,11 +395,11 @@ impl ContainerSpec {
     fn binds(&self) -> Vec<String> {
         let mut vec = vec![];
         self.binds.iter().for_each(|(container, host)| {
-            vec.push(format!("{}:{}", host, container));
+            vec.push(format!("{host}:{container}"));
         });
         if let Some(binary) = &self.binary {
             binary.binds.iter().for_each(|(container, host)| {
-                vec.push(format!("{}:{}", host, container));
+                vec.push(format!("{host}:{container}"));
             });
         }
         vec.dedup();
@@ -438,7 +438,7 @@ impl ContainerSpec {
     fn environment(&self) -> Vec<String> {
         let mut vec = vec![];
         self.env.iter().for_each(|(k, v)| {
-            vec.push(format!("{}={}", k, v));
+            vec.push(format!("{k}={v}"));
         });
         vec
     }
@@ -624,7 +624,7 @@ impl Builder {
             .map_err(|error| bollard::errors::Error::IOError {
                 err: std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
-                    format!("Invalid network format: {}", error),
+                    format!("Invalid network format: {error}"),
                 ),
             })?;
         Ok(self)
@@ -915,7 +915,7 @@ impl Drop for ComposeTest {
             self.containers.keys().for_each(|name| {
                 tracing::error!("Logs from container '{}':", name);
                 let _ = std::process::Command::new("docker")
-                    .args(&["logs", name])
+                    .args(["logs", name])
                     .status();
             });
         }
@@ -923,28 +923,28 @@ impl Drop for ComposeTest {
         if self.clean && (!thread::panicking() || self.allow_clean_on_panic) {
             self.shutdown_order.iter().for_each(|c| {
                 std::process::Command::new("docker")
-                    .args(&["kill", "-s", "term", c])
+                    .args(["kill", "-s", "term", c])
                     .output()
                     .unwrap();
             });
 
             self.containers.keys().for_each(|c| {
                 std::process::Command::new("docker")
-                    .args(&["kill", "-s", "term", c])
+                    .args(["kill", "-s", "term", c])
                     .output()
                     .unwrap();
                 std::process::Command::new("docker")
-                    .args(&["kill", c])
+                    .args(["kill", c])
                     .output()
                     .unwrap();
                 std::process::Command::new("docker")
-                    .args(&["rm", "-v", c])
+                    .args(["rm", "-v", c])
                     .output()
                     .unwrap();
             });
 
             std::process::Command::new("docker")
-                .args(&["network", "rm", &self.name])
+                .args(["network", "rm", &self.name])
                 .output()
                 .unwrap();
         }
@@ -1185,7 +1185,7 @@ impl ComposeTest {
 
         let srcdir_str = self.srcdir.to_str().unwrap();
         let mut binds = vec![
-            format!("{}:{}", srcdir_str, srcdir_str),
+            format!("{srcdir_str}:{srcdir_str}"),
             "/dev/hugepages:/dev/hugepages:rw".into(),
         ];
 
@@ -1199,7 +1199,7 @@ impl ComposeTest {
                     bin.path.as_path()
                 };
                 let path = path.to_str().unwrap();
-                binds.push(format!("{}:{}", path, path));
+                binds.push(format!("{path}:{path}"));
             }
             if (spec.image.is_some() || self.image.is_some()) && spec.init.unwrap_or(true) {
                 if let Ok(tini) = Binary::which("tini") {
@@ -1257,7 +1257,7 @@ impl ComposeTest {
         );
 
         let mut env = spec.environment();
-        env.push(format!("MY_POD_IP={}", ipv4));
+        env.push(format!("MY_POD_IP={ipv4}"));
 
         // figure out which ports to expose based on the port mapping
         let mut exposed_ports = HashMap::new();
@@ -1368,7 +1368,7 @@ impl ComposeTest {
     /// Pulls the docker image, if one is specified and is not present locally
     async fn pull_missing_image(&self, image: &str) {
         let image = if !image.contains(':') {
-            format!("{}:latest", image)
+            format!("{image}:latest")
         } else {
             image.to_string()
         };
@@ -1443,7 +1443,7 @@ impl ComposeTest {
             .ok_or(bollard::errors::Error::IOError {
                 err: std::io::Error::new(
                     std::io::ErrorKind::NotFound,
-                    format!("Can't start container {} as it was not configured", name),
+                    format!("Can't start container {name} as it was not configured"),
                 ),
             })?;
         if !self.reuse || self.prune_matching {
@@ -1557,7 +1557,7 @@ impl ComposeTest {
             .try_collect::<Vec<_>>()
             .await?;
 
-        logs.iter().for_each(|l| print!("{}:{}", name, l));
+        logs.iter().for_each(|l| print!("{name}:{l}"));
         Ok(())
     }
 
@@ -1624,7 +1624,7 @@ impl ComposeTest {
         for container in containers {
             if let Some(id) = container.id {
                 if let Err(e) = self.stop_id(&id).await {
-                    println!("Failed to stop container id {:?}", id);
+                    println!("Failed to stop container id {id:?}");
                     result = Err(e);
                 }
             }
@@ -1640,7 +1640,7 @@ impl ComposeTest {
         for container in containers {
             if let Some(id) = container.id {
                 if let Err(e) = self.restart_id(&id).await {
-                    println!("Failed to restart container id {:?}", id);
+                    println!("Failed to restart container id {id:?}");
                     result = Err(e);
                 }
             }

@@ -36,8 +36,8 @@ impl NvmeDevice {
     /// error if the value for the structure could not be found.
     fn new(p: &Path) -> Result<Self, NvmeError> {
         let name = p.file_name().unwrap().to_str().unwrap();
-        let devpath = format!("/sys/block/{}", name);
-        let subsyspath = format!("/sys/block/{}/device", name);
+        let devpath = format!("/sys/block/{name}");
+        let subsyspath = format!("/sys/block/{name}/device");
         let source = Path::new(devpath.as_str());
         let subsys = Path::new(subsyspath.as_str());
 

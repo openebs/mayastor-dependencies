@@ -28,7 +28,7 @@ pub struct VersionInfo {
 
 impl From<&VersionInfo> for String {
     fn from(v: &VersionInfo) -> Self {
-        format!("{}", v)
+        format!("{v}")
     }
 }
 
@@ -80,7 +80,7 @@ impl VersionInfo {
             pkg_name,
             pkg_description,
             pkg_version,
-            bin_name: bin_name.unwrap_or_else(|| "".to_string()),
+            bin_name: bin_name.unwrap_or_default(),
             build_type,
         }
     }
