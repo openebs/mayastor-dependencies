@@ -15,6 +15,20 @@ macro_rules! version_info {
             },
         )
     };
+    ($version:expr) => {
+        $crate::VersionInfo::new(
+            String::from($version),
+            String::from(env!("CARGO_PKG_NAME")),
+            String::from(env!("CARGO_PKG_DESCRIPTION")),
+            String::from(env!("CARGO_PKG_VERSION")),
+            option_env!("CARGO_BIN_NAME").map(|s| s.to_string()),
+            if cfg!(debug_assertions) {
+                String::from("debug")
+            } else {
+                String::from("")
+            },
+        )
+    };
 }
 
 /// Returns a version info instance.

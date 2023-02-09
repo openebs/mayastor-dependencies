@@ -1,3 +1,7 @@
 [submodule "h2"]
 	path = h2
 	url = https://github.com/openebs/h2.git
+[submodule "rust-git-version"]
+	path = rust-git-version
+	url = https://github.com/openebs/rust-git-version.git
+	branch = mayastor
