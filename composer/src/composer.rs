@@ -15,7 +15,7 @@ use bollard::{
     errors::Error,
     network::{CreateNetworkOptions, ListNetworksOptions},
     service::{
-        ContainerSummaryInner, EndpointIpamConfig, EndpointSettings, HostConfig, Ipam, Mount,
+        ContainerSummary, EndpointIpamConfig, EndpointSettings, HostConfig, Ipam, Mount,
         MountTypeEnum, Network, PortMap,
     },
     Docker,
@@ -29,7 +29,7 @@ use bollard::{
     container::KillContainerOptions,
     exec::{CreateExecOptions, StartExecResults},
     image::CreateImageOptions,
-    models::{ContainerCreateResponse, ContainerInspectResponse},
+    models::{ContainerCreateResponse, ContainerInspectResponse, IpamConfig},
     network::DisconnectNetworkOptions,
 };
 use futures::future::try_join_all;
@@ -804,16 +804,19 @@ impl Builder {
             .clone();
         let docker = Docker::connect_with_unix_defaults()?;
 
-        let mut cfg = HashMap::new();
-        cfg.insert(
-            "Subnet".to_string(),
-            format!("{}/{}", self.network.network(), self.network.prefix()),
-        );
-        cfg.insert("Gateway".into(), self.network.nth(1).unwrap().to_string());
-
+        let ipam_config = IpamConfig {
+            subnet: Some(format!(
+                "{}/{}",
+                self.network.network(),
+                self.network.prefix()
+            )),
+            ip_range: None,
+            gateway: Some(self.network.nth(1).unwrap().to_string()),
+            auxiliary_addresses: None,
+        };
         let ipam = Ipam {
             driver: Some("default".into()),
-            config: Some(vec![cfg]),
+            config: Some(vec![ipam_config]),
             options: None,
         };
 
@@ -1045,9 +1048,15 @@ impl ComposeTest {
         // reported as such. Networks can only be destroyed when all containers
         // attached to it are removed. To get a list of attached
         // containers, use network_list()
-        if let Err(e) = self.docker.remove_network(name).await {
-            if !matches!(e, Error::DockerResponseNotFoundError { .. }) {
-                return Err(e);
+        if let Err(error) = self.docker.remove_network(name).await {
+            if !matches!(
+                error,
+                Error::DockerResponseServerError {
+                    status_code: 404,
+                    ..
+                }
+            ) {
+                return Err(error);
             }
         }
 
@@ -1065,10 +1074,7 @@ impl ComposeTest {
             .await
     }
 
-    async fn list_network_containers(
-        &self,
-        name: &str,
-    ) -> Result<Vec<ContainerSummaryInner>, Error> {
+    async fn list_network_containers(&self, name: &str) -> Result<Vec<ContainerSummary>, Error> {
         self.docker
             .list_containers(Some(ListContainersOptions {
                 all: true,
@@ -1079,7 +1085,7 @@ impl ComposeTest {
     }
 
     /// list containers
-    pub async fn list_cluster_containers(&self) -> Result<Vec<ContainerSummaryInner>, Error> {
+    pub async fn list_cluster_containers(&self) -> Result<Vec<ContainerSummary>, Error> {
         self.docker
             .list_containers(Some(ListContainersOptions {
                 all: true,
@@ -1103,7 +1109,7 @@ impl ComposeTest {
     pub async fn get_cluster_container(
         &self,
         name: &str,
-    ) -> Result<Option<ContainerSummaryInner>, Error> {
+    ) -> Result<Option<ContainerSummary>, Error> {
         let (id, _) = self.containers.get(name).unwrap();
         let all = self
             .docker
@@ -1359,7 +1365,13 @@ impl ComposeTest {
 
         let container = self
             .docker
-            .create_container(Some(CreateContainerOptions { name }), config)
+            .create_container(
+                Some(CreateContainerOptions {
+                    name,
+                    platform: None,
+                }),
+                config,
+            )
             .await?;
 
         Ok(container)
@@ -1464,18 +1476,9 @@ impl ComposeTest {
 
     /// stop the container by its id
     pub async fn stop_id(&self, id: &str) -> Result<(), Error> {
-        if let Err(e) = self
-            .docker
+        self.docker
             .stop_container(id, Some(StopContainerOptions { t: 3 }))
             .await
-        {
-            // where already stopped
-            if !matches!(e, Error::DockerResponseNotModifiedError { .. }) {
-                return Err(e);
-            }
-        }
-
-        Ok(())
     }
 
     /// kill the container
@@ -1486,18 +1489,9 @@ impl ComposeTest {
 
     /// kill the container by its id
     pub async fn kill_id(&self, id: &str) -> Result<(), Error> {
-        if let Err(e) = self
-            .docker
+        self.docker
             .kill_container(id, Some(KillContainerOptions { signal: "SIGKILL" }))
             .await
-        {
-            // where already killed
-            if !matches!(e, Error::DockerResponseNotModifiedError { .. }) {
-                return Err(e);
-            }
-        }
-
-        Ok(())
     }
 
     /// restart the container
@@ -1508,18 +1502,9 @@ impl ComposeTest {
 
     /// restart the container id
     pub async fn restart_id(&self, id: &str) -> Result<(), Error> {
-        if let Err(e) = self
-            .docker
+        self.docker
             .restart_container(id, Some(RestartContainerOptions { t: 3 }))
             .await
-        {
-            // we're already stopped
-            if !matches!(e, Error::DockerResponseNotModifiedError { .. }) {
-                return Err(e);
-            }
-        }
-
-        Ok(())
     }
 
     /// disconnect container from the network

@@ -55,12 +55,11 @@ impl Probe {
                 &mut len,
             ))?;
 
-            let str =
-                CStr::from_bytes_with_nul(slice::from_raw_parts(data_ptr.cast(), len as usize))
-                    .map_err(|_e| DevInfoError::InvalidStr {})?
-                    .to_str()
-                    .map_err(|_e| DevInfoError::InvalidStr {})?
-                    .to_string();
+            let str = CStr::from_bytes_with_nul(slice::from_raw_parts(data_ptr.cast(), len))
+                .map_err(|_e| DevInfoError::InvalidStr {})?
+                .to_str()
+                .map_err(|_e| DevInfoError::InvalidStr {})?
+                .to_string();
             Ok(str)
         }
     }
