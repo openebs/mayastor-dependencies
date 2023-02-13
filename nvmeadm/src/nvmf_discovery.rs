@@ -180,14 +180,14 @@ impl Discovery {
         );
         let p = Path::new(NVME_FABRICS_PATH);
 
-        let mut file = OpenOptions::new()
-            .write(true)
-            .read(true)
-            .open(p)
-            .context(FileIoFailed {
-                filename: NVME_FABRICS_PATH,
-            })?;
-
+        let mut file =
+            OpenOptions::new()
+                .write(true)
+                .read(true)
+                .open(p)
+                .context(FileIoFailed {
+                    filename: NVME_FABRICS_PATH,
+                })?;
         file.write_all(self.arg_string.as_bytes())
             .context(FileIoFailed {
                 filename: NVME_FABRICS_PATH,
