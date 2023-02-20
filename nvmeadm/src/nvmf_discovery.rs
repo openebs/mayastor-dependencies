@@ -544,7 +544,6 @@ impl fmt::Display for ConnectArgs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let host_id = HOST_ID.as_str();
         write!(f, "nqn={},", self.nqn)?;
-
         if let Some(val) = &self.hostnqn {
             write!(f, "hostnqn={val},")?;
         } else {
@@ -558,11 +557,7 @@ impl fmt::Display for ConnectArgs {
             write!(f, ",keep_alive_tmo={val}")?;
         }
         if let Some(val) = self.reconnect_delay {
-<<<<<<< HEAD
             write!(f, ",reconnect_delay={val}")?;
-=======
-            write!(f, ",reconnect_delay={val}",)?;
->>>>>>> b68e5ba (fix: io-engine clippy warnings)
         }
         if let Some(val) = self.ctrl_loss_tmo {
             write!(f, ",ctrl_loss_tmo={val}")?;
