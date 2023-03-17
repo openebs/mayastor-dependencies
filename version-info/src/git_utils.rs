@@ -13,17 +13,26 @@ mod default_version {
             option_env!("GIT_VERSION_LONG").expect("git version fallback")
         }
 
-        #[cfg(not(feature = "git-version-stale"))]
+        #[cfg(not(any(feature = "git-version-stale", feature = "git-version-fallback")))]
         let version = git_version_macro::git_version!(
             args = ["--abbrev=12", "--always", "--long"],
             fallback = fallback()
         );
 
         #[cfg(feature = "git-version-stale")]
+        #[cfg(not(feature = "git-version-fallback"))]
         let version = git_version_macro::git_version!(
             args = ["--abbrev=12", "--always", "--long"],
             fallback = fallback(),
             git_deps = ["logs/HEAD"]
+        );
+
+        #[cfg(not(feature = "git-version-stale"))]
+        #[cfg(feature = "git-version-fallback")]
+        let version = git_version_macro::git_version!(
+            args = ["--abbrev=12", "--always", "--long"],
+            fallback = fallback(),
+            git_deps = []
         );
 
         version
@@ -38,17 +47,26 @@ mod default_version {
             option_env!("GIT_VERSION").expect("git version fallback")
         }
 
-        #[cfg(not(feature = "git-version-stale"))]
+        #[cfg(not(any(feature = "git-version-stale", feature = "git-version-fallback")))]
         let version = git_version_macro::git_version!(
             args = ["--abbrev=12", "--always"],
             fallback = fallback()
         );
 
         #[cfg(feature = "git-version-stale")]
+        #[cfg(not(feature = "git-version-fallback"))]
         let version = git_version_macro::git_version!(
             args = ["--abbrev=12", "--always"],
             fallback = fallback(),
             git_deps = ["logs/HEAD"]
+        );
+
+        #[cfg(feature = "git-version-fallback")]
+        #[cfg(not(feature = "git-version-stale"))]
+        let version = git_version_macro::git_version!(
+            args = ["--abbrev=12", "--always"],
+            fallback = fallback(),
+            git_deps = []
         );
 
         version

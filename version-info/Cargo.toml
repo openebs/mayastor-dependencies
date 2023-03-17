@@ -14,3 +14,4 @@ regex = "1"
 default = [ "default-git-versions" ]
 default-git-versions = [ ]
 git-version-stale = [ "default-git-versions" ]
+git-version-fallback = [ ]
