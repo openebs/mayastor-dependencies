@@ -17,7 +17,7 @@ pub struct VersionInfo {
     pub pkg_description: String,
 
     /// Cargo package version.
-    pub pkg_version: String,
+    pub pkg_version: Option<String>,
 
     /// Binary name.
     pub bin_name: String,
@@ -40,18 +40,19 @@ impl From<VersionInfo> for String {
 
 impl Display for VersionInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if let Some(ref tag) = self.version_tag {
-            write!(
+        match (&self.pkg_version, &self.version_tag) {
+            (Some(pkg_version), Some(version_tag)) => write!(
                 f,
                 "version {}, revision {} ({})",
-                self.pkg_version, self.commit_hash, tag
-            )
-        } else {
-            write!(
-                f,
-                "version {}, revision {}",
-                self.pkg_version, self.commit_hash
-            )
+                pkg_version, self.commit_hash, version_tag
+            ),
+            (Some(pkg_version), None) => {
+                write!(f, "version {}, revision {}", pkg_version, self.commit_hash)
+            }
+            (None, Some(version_tag)) => {
+                write!(f, "revision {} ({})", self.commit_hash, version_tag)
+            }
+            (None, None) => write!(f, "revision {}", self.commit_hash),
         }
     }
 }
@@ -62,7 +63,7 @@ impl VersionInfo {
         git_ver: String,
         pkg_name: String,
         pkg_description: String,
-        pkg_version: String,
+        pkg_version: Option<String>,
         bin_name: Option<String>,
         build_type: String,
     ) -> Self {
