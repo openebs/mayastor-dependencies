@@ -6,7 +6,7 @@ macro_rules! version_info {
             String::from($crate::long_raw_version_str()),
             String::from(env!("CARGO_PKG_NAME")),
             String::from(env!("CARGO_PKG_DESCRIPTION")),
-            String::from(env!("CARGO_PKG_VERSION")),
+            Some(String::from(env!("CARGO_PKG_VERSION"))),
             option_env!("CARGO_BIN_NAME").map(|s| s.to_string()),
             if cfg!(debug_assertions) {
                 String::from("debug")
@@ -15,12 +15,12 @@ macro_rules! version_info {
             },
         )
     };
-    ($version:expr) => {
+    ($pkg_version:expr, $version:expr) => {
         $crate::VersionInfo::new(
             String::from($version),
             String::from(env!("CARGO_PKG_NAME")),
             String::from(env!("CARGO_PKG_DESCRIPTION")),
-            String::from(env!("CARGO_PKG_VERSION")),
+            $pkg_version,
             option_env!("CARGO_BIN_NAME").map(|s| s.to_string()),
             if cfg!(debug_assertions) {
                 String::from("debug")
