@@ -32,7 +32,7 @@ use bollard::{
     models::{ContainerCreateResponse, ContainerInspectResponse, IpamConfig},
     network::DisconnectNetworkOptions,
 };
-use futures::future::try_join_all;
+use futures::future::{join_all, try_join_all};
 
 /// Converts a vector of Strings into vector of OsStrings.
 fn into_os_strs(v: &[String]) -> Vec<OsString> {
@@ -1553,6 +1553,7 @@ impl ComposeTest {
 
     /// start all the containers
     async fn start_all(&mut self) -> Result<(), Error> {
+        tracing::trace!("Starting all");
         for k in &self.containers {
             self.start(k.0).await?;
         }
@@ -1599,17 +1600,30 @@ impl ComposeTest {
     /// stop all the containers part of the network
     /// returns the last error, if any or Ok
     pub async fn stop_network_containers(&self) -> Result<(), Error> {
-        let mut result = Ok(());
         let containers = self.list_network_containers(&self.name).await?;
-        for container in containers {
-            if let Some(id) = container.id {
-                if let Err(e) = self.stop_id(&id).await {
-                    println!("Failed to stop container id {id:?}");
-                    result = Err(e);
-                }
-            }
-        }
-        result
+
+        let stop_tasks = containers
+            .into_iter()
+            .flat_map(|container| {
+                let name = container.names.unwrap_or_default().first().cloned();
+                container.id.map(|id| (id, name))
+            })
+            .map(|(id, name)| async move {
+                tracing::trace!("Stopping {name:?}/{id}");
+                self.stop_id(&id)
+                    .await
+                    .map_err(|error| {
+                        tracing::trace!("Failed to stop {name:?}/{id}");
+                        error
+                    })
+                    .map(|ok| {
+                        tracing::trace!("Stopped {name:?}/{id}");
+                        ok
+                    })
+            })
+            .collect::<Vec<_>>();
+
+        join_all(stop_tasks).await.into_iter().collect()
     }
 
     /// restart all the containers part of the network
