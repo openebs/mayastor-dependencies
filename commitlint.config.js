@@ -6,6 +6,7 @@ module.exports = {
   defaultIgnores: false,
   ignores: [
       (message) => message.startsWith('chore(bors): merge pull request #'),
+      (message) => message.startsWith('Merge pull request #'),
       (message) => message.startsWith('Merge #')
   ]
 }
