@@ -915,12 +915,7 @@ impl Drop for ComposeTest {
     /// destroy the containers and network. Notice that we use sync code here
     fn drop(&mut self) {
         if thread::panicking() && self.logs_on_panic {
-            self.containers.keys().for_each(|name| {
-                tracing::error!("Logs from container '{}':", name);
-                let _ = std::process::Command::new("docker")
-                    .args(["logs", name])
-                    .status();
-            });
+            self.print_all_logs();
         }
 
         if self.clean && (!thread::panicking() || self.allow_clean_on_panic) {
@@ -1694,5 +1689,22 @@ impl ComposeTest {
         }
         let exit_code = self.docker.inspect_exec(&exec.id).await?.exit_code;
         Ok((exit_code, response))
+    }
+
+    /// Print logs for all containers.
+    pub fn print_all_logs(&self) {
+        self.containers.keys().for_each(|name| {
+            self.print_log(name);
+            println!();
+        });
+    }
+
+    /// Print logs for the given container.
+    pub fn print_log(&self, cont: &str) {
+        println!("Logs from container '{cont}':");
+        let _ = std::process::Command::new("docker")
+            .args(["logs", cont])
+            .status();
+        println!("(End of logs from container '{cont}')");
     }
 }
