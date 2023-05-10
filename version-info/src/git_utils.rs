@@ -90,7 +90,6 @@ pub(super) struct GitVersion {
     pub(super) tag: Option<String>,
 
     /// Number of additional commits on top of the tag.
-    #[allow(dead_code)]
     pub(super) num_commits: Option<String>,
 }
 
