@@ -10,6 +10,9 @@ pub struct VersionInfo {
     /// Version tag on which the product was built.
     pub version_tag: Option<String>,
 
+    /// Number of additional commits on top of the tag.
+    pub num_commits: Option<String>,
+
     /// Cargo package name.
     pub pkg_name: String,
 
@@ -40,7 +43,15 @@ impl From<VersionInfo> for String {
 
 impl Display for VersionInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match (&self.pkg_version, &self.version_tag) {
+        let version_tag = self
+            .version_tag
+            .as_ref()
+            .map(|tag| match &self.num_commits {
+                // todo: add -dirty when the tree is not clean
+                Some(num_commits) => format!("{tag}+{num_commits}"),
+                None => tag.to_string(),
+            });
+        match (&self.pkg_version, version_tag) {
             (Some(pkg_version), Some(version_tag)) => write!(
                 f,
                 "version {}, revision {} ({})",
@@ -78,6 +89,7 @@ impl VersionInfo {
         VersionInfo {
             commit_hash: gv.commit_hash,
             version_tag: gv.tag,
+            num_commits: gv.num_commits,
             pkg_name,
             pkg_description,
             pkg_version,
