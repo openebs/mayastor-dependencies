@@ -29,13 +29,13 @@ use std::{io::ErrorKind, marker::PhantomData, time::Duration};
 pub type BusResult<T> = Result<T, Error>;
 
 /// Initialise the Nats Message Bus.
-pub async fn message_bus_init(server: &str) -> NatsMessageBus {
+pub async fn message_bus_init(server: &str) -> impl crate::Bus {
     NatsMessageBus::new(server).await
 }
 
 /// Nats implementation of the Bus.
 #[derive(Clone)]
-pub struct NatsMessageBus {
+pub(crate) struct NatsMessageBus {
     client: Client,
     jetstream: Context,
 }
