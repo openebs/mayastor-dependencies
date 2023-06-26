@@ -4,7 +4,7 @@ use crate::{
         errors::Error,
         retry::{backoff_with_options, BackoffOptions},
     },
-    message::EventMessage,
+    event::EventMessage,
     Bus,
 };
 use async_nats::{
@@ -29,8 +29,10 @@ use std::{io::ErrorKind, marker::PhantomData, time::Duration};
 pub type BusResult<T> = Result<T, Error>;
 
 /// Initialise the Nats Message Bus.
-pub async fn message_bus_init(server: &str) -> impl crate::Bus {
-    NatsMessageBus::new(server).await
+pub async fn message_bus_init(server: &str, msg_replicas: Option<usize>) -> impl crate::Bus {
+    let bus = NatsMessageBus::new(server).await;
+    let _ = bus.get_or_create_stream(None, msg_replicas).await;
+    bus
 }
 
 /// Nats implementation of the Bus.
@@ -100,7 +102,7 @@ impl NatsMessageBus {
     /// Ensures that the stream is created on jetstream.
     pub async fn verify_stream_exists(&mut self) -> BusResult<()> {
         let options = BackoffOptions::new().with_max_retries(0);
-        if let Err(err) = self.get_or_create_stream(Some(options)).await {
+        if let Err(err) = self.get_or_create_stream(Some(options), None).await {
             tracing::warn!(%err,
                 "Error while getting/creating stream '{}'",
                 STREAM_NAME
@@ -164,6 +166,7 @@ impl NatsMessageBus {
     pub async fn get_or_create_stream(
         &self,
         retry_options: Option<BackoffOptions>,
+        msg_replicas: Option<usize>,
     ) -> BusResult<Stream> {
         tracing::debug!("Getting/creating stream '{}'", STREAM_NAME);
         let options = retry_options.unwrap_or(BackoffOptions::new());
@@ -177,7 +180,7 @@ impl NatsMessageBus {
             storage: async_nats::jetstream::stream::StorageType::Memory, /* The type of storage
                                                                           * backend, `File`
                                                                           * (default) */
-            num_replicas: NUM_STREAM_REPLICAS,
+            num_replicas: msg_replicas.unwrap_or(NUM_STREAM_REPLICAS),
             ..async_nats::jetstream::stream::Config::default()
         };
 
@@ -212,13 +215,19 @@ impl NatsMessageBus {
     }
 
     /// Returns subject for the message. Should be unique for each message.
-    fn subject(msg: &EventMessage) -> String {
-        format!("events.{}.{}", msg.category.to_string(), msg.metadata.id) // If category is volume
-                                                                           // and id is
-                                                                           // 'id', then the subject
-                                                                           // for the
-                                                                           // message is
-                                                                           // 'events.volume.id'
+    fn subject(msg: &EventMessage) -> BusResult<String> {
+        let event_id = match &msg.metadata {
+            Some(event_meta) => &event_meta.id,
+            None => {
+                return Err(Error::InvalidMessageId {
+                    error_msg: "the message id must not be empty".to_string(),
+                })
+            }
+        };
+        // If category is volume and id is 'id', then the subject for the message is
+        // 'events.volume.id'
+        let subject = format!("events.{}.{}", msg.category, event_id);
+        Ok(subject)
     }
 
     /// The payload for mbus publish from the message.
@@ -237,7 +246,7 @@ impl Bus for NatsMessageBus {
         let mut tries = 0;
         let mut log_error = true;
 
-        let subject = NatsMessageBus::subject(message);
+        let subject = NatsMessageBus::subject(message)?;
         let payload = NatsMessageBus::payload(message)?;
 
         loop {
@@ -283,7 +292,7 @@ impl Bus for NatsMessageBus {
         &mut self,
     ) -> BusResult<BusSubscription<T>> {
         tracing::trace!("Subscribing to Nats message bus");
-        let stream = self.get_or_create_stream(None).await?;
+        let stream = self.get_or_create_stream(None, None).await?;
 
         let messages = self.create_consumer_and_get_messages(stream).await?;
         tracing::trace!("Subscribed to Nats message bus successfully");
