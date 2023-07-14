@@ -1,7 +1,7 @@
 use crate::{
     common::constants::MAX_BUFFER_MSGS, event_layer::EventLayer, publisher::MbusPublisher,
 };
-use mbus_api::{event::EventMessage, event_traits::initilize_source_component};
+use events_api::{event::EventMessage, event_traits::initilize_source_component};
 
 /// Event handle.
 pub struct EventHandle {}

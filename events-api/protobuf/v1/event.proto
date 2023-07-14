@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+import "google/protobuf/wrappers.proto";
+
+import "google/protobuf/timestamp.proto";
+
+package v1.event;
+
+// Event Message
+message EventMessage {
+    // Event category
+    EventCategory category = 1;
+    // Event action
+    EventAction action = 2;
+    // Target id for the category against which action is performed
+    string target = 3;
+    // Event meta data
+    EventMeta metadata = 4;
+}
+
+// Event Category
+enum EventCategory {
+  UnknownCategory = 0;
+  Pool = 1;
+  Volume = 2;
+}
+
+// Event Action
+enum EventAction {
+  UnknownAction = 0;
+  Create = 1;
+  Delete = 2;
+}
+
+// Event meta data
+message EventMeta {
+    // Something that uniquely identifies events. UUIDv4. GUID.
+    string id = 1;
+    EventSource source = 2;
+    // Event timestamp
+    google.protobuf.Timestamp timestamp = 3;
+    // Version of the event message
+    Version version = 4;
+}
+
+// Event source
+message EventSource {
+  // Io-engine or core-agent
+  Component component = 1;
+  // Node name
+  string node = 2;
+}
+
+// Source Component
+enum Component {
+  UnknownComponent = 0;
+  CoreAgent = 1;
+  IoEngine = 2;
+}
+
+// Event message version
+enum Version {
+  UnknownVersion = 0;
+  V1 = 1;
+}

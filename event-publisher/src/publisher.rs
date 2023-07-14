@@ -1,4 +1,4 @@
-use mbus_api::{event::EventMessage, mbus_nats::message_bus_init, Bus};
+use events_api::{event::EventMessage, mbus_nats::message_bus_init, Bus};
 
 /// Message bus publisher.
 #[derive(Clone)]
@@ -17,19 +17,13 @@ impl MbusPublisher {
         mut mbus: impl Bus,
         mut recv: tokio::sync::mpsc::Receiver<EventMessage>,
     ) {
-        loop {
-            match recv.recv().await {
-                Some(event_msg) => {
-                    if let Err(err) = mbus.publish(&event_msg).await {
-                        tracing::debug!("Error publishing event message to mbus: {:?}", err);
-                        // TODO retry the event publish when there is publish error if the buffer if
-                        // not half full.
-                    }
-                }
-                // Channel has been closed and there are no remaining messages in the channel's
-                // buffer.
-                None => break,
+        while let Some(event_msg) = recv.recv().await {
+            if let Err(err) = mbus.publish(&event_msg).await {
+                tracing::debug!("Error publishing event message to mbus: {:?}", err);
+                // TODO retry the event publish when there is publish error if the buffer if
+                // not half full.
             }
         }
+        // Channel has been closed and there are no remaining messages in the channel's buffer.
     }
 }

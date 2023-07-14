@@ -31,6 +31,9 @@ pub enum Error {
         error
     ))]
     StreamError { stream: String, error: String },
+    /// Invalid event message id.
+    #[snafu(display("Error while generating subject: {}", error_msg))]
+    InvalidMessageId { error_msg: String },
     /// Failed to serialise value.
     #[snafu(display("Failed to serialise value. Error {}", source))]
     SerdeSerializeError { source: serde_json::Error },

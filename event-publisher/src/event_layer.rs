@@ -1,4 +1,4 @@
-use mbus_api::event::EventMessage;
+use events_api::event::EventMessage;
 use std::fmt::Debug;
 use tokio::sync::mpsc::{error::TrySendError, Sender};
 use tracing::field::{Field, Visit};
