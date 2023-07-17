@@ -44,7 +44,7 @@ pub(crate) struct NatsMessageBus {
 
 impl NatsMessageBus {
     /// Connect to nats server.
-    pub async fn connect(server: &str) -> Client {
+    async fn connect(server: &str) -> Client {
         tracing::debug!("Connecting to the nats server {}...", server);
         // We retry in a loop until successful. Once connected the nats library will handle
         // reconnections for us.
