@@ -35,7 +35,7 @@ impl EventMessage {
     /// Generate the event trace with event message.
     pub fn generate(&self) {
         let event_data = serde_json::to_string(&self).unwrap_or_default();
-        tracing::event!(target: "target-mbus", tracing::Level::INFO, event_data);
+        tracing::event!(target: "mbus-events-target", tracing::Level::INFO, event_data);
     }
 }
 
