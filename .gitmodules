@@ -1,7 +1,7 @@
 [submodule "h2"]
 	path = h2
 	url = https://github.com/openebs/h2.git
-	branch = v0.3.13-auth-fix
+	branch = v0.3-auth-fix
 [submodule "rust-git-version"]
 	path = rust-git-version
 	url = https://github.com/openebs/rust-git-version.git
