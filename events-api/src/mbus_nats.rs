@@ -169,7 +169,7 @@ impl NatsMessageBus {
         msg_replicas: Option<usize>,
     ) -> BusResult<Stream> {
         tracing::debug!("Getting/creating stream '{}'", STREAM_NAME);
-        let options = retry_options.unwrap_or(BackoffOptions::new());
+        let options = retry_options.unwrap_or_default();
         let mut tries = 0;
         let mut log_error = true;
         let stream_config = async_nats::jetstream::stream::Config {
@@ -299,7 +299,7 @@ impl Bus for NatsMessageBus {
 
         return Ok(BusSubscription {
             messages,
-            _phantom: PhantomData::default(),
+            _phantom: Default::default(),
         });
     }
 }
