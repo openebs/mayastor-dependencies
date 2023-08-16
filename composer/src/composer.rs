@@ -729,6 +729,23 @@ impl Builder {
         self
     }
 
+    /// Output logs on drop if there was a panic.
+    pub fn logs_on_panic(&self) -> bool {
+        self.logs_on_panic
+    }
+    /// Cleans containers on drop.
+    pub fn clean(&self) -> bool {
+        self.clean
+    }
+    /// Cleans containers on drop if there was a panic.
+    pub fn clean_on_panic(&self) -> bool {
+        self.allow_clean_on_panic
+    }
+    /// Prune containers on start.
+    pub fn prune(&self) -> bool {
+        self.prune
+    }
+
     /// use base image for all binary containers
     pub fn with_base_image<S: Into<Option<String>>>(mut self, image: S) -> Builder {
         self.image = image.into();
