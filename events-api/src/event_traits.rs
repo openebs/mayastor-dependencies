@@ -13,12 +13,20 @@ pub fn initilize_source_component(comp: &str) {
 
 impl EventMeta {
     /// New event metadata with default values.
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             source: Some(EventSource::new("".to_string())),
             timestamp: Some(Utc::now().into()),
             version: Version::V1.into(),
+        }
+    }
+
+    /// Event metadata with given source.
+    pub fn from_source(source: EventSource) -> Self {
+        Self {
+            source: Some(source),
+            ..Self::new()
         }
     }
 }
@@ -58,7 +66,8 @@ mod test {
     #[test]
     fn component_initialization_with_unknown_input() {
         initilize_source_component("component");
-        let event_meta = EventMeta::new();
+        let event_source = EventSource::new("".to_string());
+        let event_meta = EventMeta::from_source(event_source);
         assert_eq!(
             event_meta.source.unwrap().component,
             Component::UnknownComponent as i32
@@ -68,7 +77,8 @@ mod test {
     #[test]
     fn metadata_for_new_event() {
         initilize_source_component("component");
-        let event_meta = EventMeta::new();
+        let event_source = EventSource::new("".to_string());
+        let event_meta = EventMeta::from_source(event_source);
         assert!(!event_meta.id.is_empty());
         assert!(!event_meta.timestamp.unwrap().to_string().is_empty());
         assert_eq!(event_meta.version, Version::V1 as i32);

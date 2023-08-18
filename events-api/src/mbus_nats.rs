@@ -11,9 +11,10 @@ use async_nats::{
     jetstream::{
         self,
         consumer::{
-            push::{Config, Messages},
+            push::{Config, Messages, MessagesErrorKind},
             DeliverPolicy,
         },
+        context::PublishErrorKind,
         stream::Stream,
         Context,
     },
@@ -23,7 +24,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{io::ErrorKind, marker::PhantomData, time::Duration};
+use std::{marker::PhantomData, time::Duration};
 
 /// Result wrapper for Jetstream requests.
 pub type BusResult<T> = Result<T, Error>;
@@ -99,18 +100,6 @@ impl NatsMessageBus {
         }
     }
 
-    /// Ensures that the stream is created on jetstream.
-    pub async fn verify_stream_exists(&mut self) -> BusResult<()> {
-        let options = BackoffOptions::new().with_max_retries(0);
-        if let Err(err) = self.get_or_create_stream(Some(options), None).await {
-            tracing::warn!(%err,
-                "Error while getting/creating stream '{}'",
-                STREAM_NAME
-            );
-        }
-        Ok(())
-    }
-
     /// Creates consumer and returns an iterator for the messages on the stream.
     async fn create_consumer_and_get_messages(&mut self, stream: Stream) -> BusResult<Messages> {
         tracing::debug!("Getting/creating consumer for stats '{}'", CONSUMER_NAME);
@@ -140,16 +129,19 @@ impl NatsMessageBus {
                         );
                         return Ok(messages);
                     }
-                    Err(error) => error,
+                    Err(error) => Error::ConsumerError {
+                        consumer: CONSUMER_NAME.to_string(),
+                        error: error.to_string(),
+                    },
                 },
-                Err(error) => error,
+                Err(error) => Error::ConsumerError {
+                    consumer: CONSUMER_NAME.to_string(),
+                    error: error.to_string(),
+                },
             };
 
             if tries == options.max_retries {
-                return Err(Error::ConsumerError {
-                    consumer: CONSUMER_NAME.to_string(),
-                    error: err.to_string(),
-                });
+                return Err(err);
             }
             if log_error {
                 tracing::warn!(%err,
@@ -200,7 +192,7 @@ impl NatsMessageBus {
             if tries == options.max_retries {
                 return Err(Error::StreamError {
                     stream: STREAM_NAME.to_string(),
-                    error: err.to_string(),
+                    source: err,
                 });
             }
             if log_error {
@@ -265,7 +257,6 @@ impl Bus for NatsMessageBus {
                 tracing::warn!(%err,
                     "Error publishing message to jetstream. Retrying..."
                 );
-                let _stream = self.verify_stream_exists().await; // Check and create a stream if necessary. Useful when the stream is deleted.
                 log_error = false;
             }
 
@@ -273,15 +264,23 @@ impl Bus for NatsMessageBus {
                 return Err(Error::PublishError {
                     retries: options.max_retries,
                     payload: format!("{message:?}"),
-                    error: err.to_string(),
+                    source: err,
                 });
             }
-            if let Some(error) = err.downcast_ref::<std::io::Error>() {
-                if error.kind() == ErrorKind::TimedOut {
+
+            match err.kind() {
+                PublishErrorKind::TimedOut => {
                     tries += 1;
                     continue;
                 }
+                PublishErrorKind::StreamNotFound => {
+                    let _ = self.get_or_create_stream(None, None).await?;
+                    tries += 1;
+                    continue;
+                }
+                _ => (),
             }
+
             backoff_with_options(&mut tries, &options).await;
         }
     }
@@ -320,7 +319,13 @@ impl<T: Serialize + DeserializeOwned> BusSubscription<T> {
                 let message = match message {
                     Ok(message) => message,
                     Err(error) => {
-                        tracing::warn!(%error, "Error accessing jetstream message");
+                        match error.kind() {
+                            // TODO create consumer again
+                            MessagesErrorKind::ConsumerDeleted => (),
+                            // TODO check if stream and consumer exists,
+                            MessagesErrorKind::MissingHeartbeat => (),
+                            _ => tracing::warn!(%error, "Error accessing jetstream message"),
+                        };
                         continue;
                     }
                 };
