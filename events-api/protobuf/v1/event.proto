@@ -23,6 +23,7 @@ enum EventCategory {
   UnknownCategory = 0;
   Pool = 1;
   Volume = 2;
+  Nexus = 3;
 }
 
 // Event Action
@@ -30,6 +31,9 @@ enum EventAction {
   UnknownAction = 0;
   Create = 1;
   Delete = 2;
+  StateChange = 3;
+  RebuildBegin = 4;
+  RebuildEnd = 5;
 }
 
 // Event meta data
