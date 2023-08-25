@@ -9,13 +9,13 @@ pub enum Error {
     #[snafu(display(
         "Jetstream Publish Error. Retried '{}' times. Error: {}. Message : {}",
         retries,
-        error,
+        source,
         payload
     ))]
     PublishError {
         retries: u32,
         payload: String,
-        error: String,
+        source: async_nats::jetstream::context::PublishError,
     },
     /// Failed to get consumer messages.
     #[snafu(display(
@@ -28,9 +28,12 @@ pub enum Error {
     #[snafu(display(
         "Jetstream Error while getting/creating stream '{}': {}",
         stream,
-        error
+        source
     ))]
-    StreamError { stream: String, error: String },
+    StreamError {
+        stream: String,
+        source: async_nats::jetstream::context::CreateStreamError,
+    },
     /// Invalid event message id.
     #[snafu(display("Error while generating subject: {}", error_msg))]
     InvalidMessageId { error_msg: String },

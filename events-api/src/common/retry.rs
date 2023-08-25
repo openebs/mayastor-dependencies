@@ -59,12 +59,6 @@ impl BackoffOptions {
         self
     }
 
-    /// Specify a max number of retries before giving up.
-    pub fn with_max_retries(mut self, max_retries: u32) -> Self {
-        self.max_retries = max_retries;
-        self
-    }
-
     pub fn publish_backoff_options() -> Self {
         Self {
             init_delay: Duration::from_secs(5),
