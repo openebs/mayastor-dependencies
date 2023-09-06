@@ -1,4 +1,7 @@
-use crate::event::{Component, EventMessage, EventMeta, EventSource, Version};
+use crate::event::{
+    Component, EventDetails, EventMessage, EventMeta, EventSource, RebuildEventDetails,
+    RebuildStatus, Version,
+};
 use chrono::Utc;
 use once_cell::sync::OnceCell;
 use std::str::FromStr;
@@ -35,7 +38,32 @@ impl EventSource {
     /// New event source with default values.
     pub fn new(node: String) -> Self {
         let component = COMPONENT.get().cloned().unwrap_or_default().into();
-        Self { component, node }
+        Self {
+            component,
+            node,
+            ..Default::default()
+        }
+    }
+
+    /// Add rebuild event specific data to event source.
+    pub fn add_rebuild_data(
+        self,
+        status: RebuildStatus, // Rebuild status
+        source: &str,          // Rebuild source replica uri
+        destination: &str,     // Rebuild destination replica uri
+        error: Option<String>, // Rebuild error for RebuildFail event
+    ) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                rebuild_details: Some(RebuildEventDetails {
+                    rebuild_status: status as i32,
+                    source_replica: source.to_string(),
+                    destination_replica: destination.to_string(),
+                    error,
+                }),
+            }),
+            ..self
+        }
     }
 }
 

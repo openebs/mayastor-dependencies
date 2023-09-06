@@ -53,6 +53,8 @@ message EventSource {
   Component component = 1;
   // Node name
   string node = 2;
+  // Event specific details
+  optional EventDetails event_details = 3;
 }
 
 // Source Component
@@ -66,4 +68,36 @@ enum Component {
 enum Version {
   UnknownVersion = 0;
   V1 = 1;
+}
+
+// Event specific details
+message EventDetails {
+  // Rebuild event details
+  optional RebuildEventDetails rebuild_details = 1;
+}
+
+// Rebuild event details
+message RebuildEventDetails {
+  // Rebuild status
+  RebuildStatus rebuild_status = 1;
+  // Rebuild source replica uri
+  string source_replica = 2;
+  // Rebuild destination replica uri
+  string destination_replica = 3;
+  // Rebuild error for RebuildFail event
+  optional string error = 4;
+}
+
+// Rebuild status
+enum RebuildStatus {
+  // Unknown
+  Unknown = 0;
+  // Rebuild started
+  Started = 1;
+  // Rebuild is completed successfully
+  Completed = 2;
+  // Rebuild is stopped
+  Stopped = 3;
+  // Rebuild failed
+  Failed = 4;
 }
