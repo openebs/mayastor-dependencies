@@ -1,6 +1,6 @@
 use crate::event::{
     Component, EventDetails, EventMessage, EventMeta, EventSource, RebuildEventDetails,
-    RebuildStatus, Version,
+    RebuildStatus, ReplicaEventDetails, Version,
 };
 use chrono::Utc;
 use once_cell::sync::OnceCell;
@@ -46,7 +46,7 @@ impl EventSource {
     }
 
     /// Add rebuild event specific data to event source.
-    pub fn add_rebuild_data(
+    pub fn with_rebuild_data(
         self,
         status: RebuildStatus, // Rebuild status
         source: &str,          // Rebuild source replica uri
@@ -61,6 +61,22 @@ impl EventSource {
                     destination_replica: destination.to_string(),
                     error,
                 }),
+                ..Default::default()
+            }),
+            ..self
+        }
+    }
+
+    /// Add replica event specific data to event source.
+    pub fn with_replica_data(self, pool_name: &str, pool_uuid: &str, replica_name: &str) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                replica_details: Some(ReplicaEventDetails {
+                    pool_name: pool_name.to_string(),
+                    pool_uuid: pool_uuid.to_string(),
+                    replica_name: replica_name.to_string(),
+                }),
+                ..Default::default()
             }),
             ..self
         }
