@@ -9,7 +9,7 @@ snafu = "0.7.5"
 url = "2.4.1"
 uuid = { version = "1.4.1", features = ["v4"] }
 [build-dependencies]
-bindgen = "0.64.0"
+bindgen = "0.68.1"
 
 [target.'cfg(target_os="linux")'.dependencies]
-udev = "0.7.0"
+udev = "0.8.0"
