@@ -7,7 +7,7 @@ authors = [
 ]
 
 [dependencies]
-git-version-macro = { path = "../rust-git-version/git-version-macro" }
+git-version-macro = { path = "../git-version-macro" }
 regex = "1"
 
 [features]
