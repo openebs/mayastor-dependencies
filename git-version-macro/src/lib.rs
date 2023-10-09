@@ -177,7 +177,7 @@ fn git_version_impl(args: Args) -> syn::Result<TokenStream2> {
 
 	let cargo_fallback = args.cargo_prefix.is_some() || args.cargo_suffix.is_some();
 
-	match describe_cwd(&git_args) {
+	match describe_cwd(git_args) {
 		Ok(version) => {
 			let dependencies = git_dependencies(git_deps)?;
 			let prefix = args.prefix.iter();

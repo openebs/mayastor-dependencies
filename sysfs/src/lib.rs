@@ -46,7 +46,7 @@ where
 pub fn parse_dict(dir: &Path, file: &str) -> Result<HashMap<String, String>> {
     let path = dir.join(file);
     let mut dict = HashMap::new();
-    let f = fs::File::open(&path)?;
+    let f = fs::File::open(path)?;
     let file = BufReader::new(&f);
 
     for line in file.lines() {
