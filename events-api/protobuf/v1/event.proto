@@ -24,6 +24,9 @@ enum EventCategory {
   Pool = 1;
   Volume = 2;
   Nexus = 3;
+  Replica = 4;
+  Node = 5;
+  HighAvailability = 6;
 }
 
 // Event Action
@@ -74,6 +77,8 @@ enum Version {
 message EventDetails {
   // Rebuild event details
   optional RebuildEventDetails rebuild_details = 1;
+  // Replica event details
+  optional ReplicaEventDetails replica_details = 2;
 }
 
 // Rebuild event details
@@ -100,4 +105,14 @@ enum RebuildStatus {
   Stopped = 3;
   // Rebuild failed
   Failed = 4;
+}
+
+// Replica event details
+message ReplicaEventDetails {
+  // Pool name
+  string pool_name = 1;
+  // Pool uuid
+  string pool_uuid = 2;
+  // Replica name
+  string replica_name = 3;
 }
