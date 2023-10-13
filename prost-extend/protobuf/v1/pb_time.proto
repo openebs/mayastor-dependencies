@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+import "google/protobuf/wrappers.proto";
+
+package v1.pb_time;
+
+
+message Timestamp {
+    // Number of non-leap seconds since January 1, 1970 0:00:00 UTC - UNIX timestamp
+    int64 seconds = 1;
+    // Returns the number of nanoseconds since the last second boundary
+    uint32 nanos = 2;
+}

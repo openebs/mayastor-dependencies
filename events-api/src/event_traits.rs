@@ -124,7 +124,7 @@ mod test {
         let event_source = EventSource::new("".to_string());
         let event_meta = EventMeta::from_source(event_source);
         assert!(!event_meta.id.is_empty());
-        assert!(!event_meta.timestamp.unwrap().to_string().is_empty());
+        assert!(event_meta.timestamp.is_some());
         assert_eq!(event_meta.version, Version::V1 as i32);
         assert_ne!(event_meta.source, None);
     }
