@@ -5,10 +5,10 @@ edition = "2021"
 
 
 [build-dependencies]
-tonic-build = "0.8.4"
+tonic-build = "0.10.2"
 
 [dependencies]
 chrono = "0.4.26"
 serde = "1.0.183"
-tonic = "0.8.3"
-prost = "0.11.9"
+tonic = "0.10.2"
+prost = "0.12.1"
