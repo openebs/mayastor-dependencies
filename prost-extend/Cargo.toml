@@ -1,0 +1,14 @@
+[package]
+name = "prost-extend"
+version = "0.1.0"
+edition = "2021"
+
+
+[build-dependencies]
+tonic-build = "0.8.4"
+
+[dependencies]
+chrono = "0.4.26"
+serde = "1.0.183"
+tonic = "0.8.3"
+prost = "0.11.9"
