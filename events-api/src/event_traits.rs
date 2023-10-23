@@ -10,7 +10,7 @@ use std::str::FromStr;
 static COMPONENT: OnceCell<Component> = OnceCell::new();
 
 /// Initialize the event source component with the service name.
-pub fn initilize_source_component(comp: &str) {
+pub fn initialize_source_component(comp: &str) {
     COMPONENT.get_or_init(|| Component::from_str(comp).unwrap_or_default());
 }
 
@@ -105,11 +105,11 @@ impl FromStr for Component {
 
 #[cfg(test)]
 mod test {
-    use crate::{event::*, event_traits::initilize_source_component};
+    use crate::{event::*, event_traits::initialize_source_component};
 
     #[test]
     fn component_initialization_with_unknown_input() {
-        initilize_source_component("component");
+        initialize_source_component("component");
         let event_source = EventSource::new("".to_string());
         let event_meta = EventMeta::from_source(event_source);
         assert_eq!(
@@ -120,7 +120,7 @@ mod test {
 
     #[test]
     fn metadata_for_new_event() {
-        initilize_source_component("component");
+        initialize_source_component("component");
         let event_source = EventSource::new("".to_string());
         let event_meta = EventMeta::from_source(event_source);
         assert!(!event_meta.id.is_empty());
