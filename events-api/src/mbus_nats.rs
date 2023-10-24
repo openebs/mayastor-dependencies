@@ -315,36 +315,35 @@ impl<T: Serialize + DeserializeOwned> BusSubscription<T> {
     /// Access to the next message for the consumer.
     pub async fn next(&mut self) -> Option<T> {
         loop {
-            if let Some(message) = self.messages.next().await {
-                let message = match message {
-                    Ok(message) => message,
-                    Err(error) => {
-                        match error.kind() {
-                            // TODO create consumer again
-                            MessagesErrorKind::ConsumerDeleted => (),
-                            // TODO check if stream and consumer exists,
-                            MessagesErrorKind::MissingHeartbeat => (),
-                            _ => tracing::warn!(%error, "Error accessing jetstream message"),
-                        };
-                        continue;
-                    }
-                };
-                let _ack = message
-                    .ack()
-                    .await
-                    .map_err(|error| tracing::warn!(%error, "Error acking jetstream message"));
-                let value: Result<T, _> = serde_json::from_slice(&message.payload);
-                match value {
-                    Ok(value) => return Some(value),
-                    Err(_error) => {
-                        tracing::warn!(
-                            "Error parsing jetstream message: {:?}; message ignored",
-                            message
-                        );
-                    }
-                }
-            } else {
+            let Some(message) = self.messages.next().await else {
                 return None;
+            };
+            let message = match message {
+                Ok(message) => message,
+                Err(error) => {
+                    match error.kind() {
+                        // TODO create consumer again
+                        MessagesErrorKind::ConsumerDeleted => (),
+                        // TODO check if stream and consumer exists,
+                        MessagesErrorKind::MissingHeartbeat => (),
+                        _ => tracing::warn!(%error, "Error accessing jetstream message"),
+                    }
+                    continue;
+                }
+            };
+            let _ack = message
+                .ack()
+                .await
+                .map_err(|error| tracing::warn!(%error, "Error acking jetstream message"));
+            let value: Result<T, _> = serde_json::from_slice(&message.payload);
+            match value {
+                Ok(value) => return Some(value),
+                Err(_error) => {
+                    tracing::warn!(
+                        "Error parsing jetstream message: {:?}; message ignored",
+                        message
+                    );
+                }
             }
         }
     }
