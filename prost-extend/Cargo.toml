@@ -2,6 +2,7 @@
 name = "prost-extend"
 version = "0.1.0"
 edition = "2021"
+description = "A thinner prost-wkt fork with just the bits we need"
 
 
 [build-dependencies]
@@ -10,5 +11,4 @@ tonic-build = "0.10.2"
 [dependencies]
 chrono = "0.4.26"
 serde = "1.0.183"
-tonic = "0.10.2"
 prost = "0.12.1"
