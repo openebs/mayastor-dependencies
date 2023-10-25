@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+import "common.proto";
+package mayastor.v1;
+
+service ReplicaRpc {
+  // Replica related methods.
+  //
+  // Replica allocates space from storage pool.
+  rpc CreateReplica (CreateReplicaRequest) returns (Replica) {}
+  rpc DestroyReplica (DestroyReplicaRequest) returns (google.protobuf.Empty) {}
+  rpc ListReplicas (ListReplicaOptions) returns (ListReplicasResponse) {}
+  rpc ShareReplica (ShareReplicaRequest) returns (Replica) {}
+  rpc UnshareReplica (UnshareReplicaRequest) returns (Replica) {}
+}
+
+// Replica space usage
+message ReplicaSpaceUsage {
+  uint64 capacity_bytes = 1; // replica capacity in bytes.
+  uint64 allocated_bytes = 2; // amount of actually allocated disk space for this replica in bytes
+  uint64 cluster_size = 3; // cluster size in bytes
+  uint64 num_clusters = 4; // total number of clusters
+  uint64 num_allocated_clusters = 5; // number of actually used clusters
+  uint64 allocated_bytes_snapshots = 6; // amount of space allocated by all replica snapshots
+  uint64 num_allocated_clusters_snapshots = 7; // number of clusters used by all replica snapshots
+  optional uint64 allocated_bytes_snapshot_from_clone = 8; // actual amount of disk space allocated by snapshot which is created from clone
+}
+
+// Replica properties
+message Replica {
+  string name = 1;  // name of the replica
+  string uuid = 2;  // uuid of the replica
+  string pooluuid = 3; // uuid of the pool on which replica is present
+  uint64 size = 4;  // size of the replica in bytes
+  bool thin = 5;    // thin provisioning
+  ShareProtocol share = 6;  // protocol used for exposing the replica
+  string uri = 7;   // uri under which the replica is accessible by nexus
+  string poolname = 8; // name of the pool on which replica is present
+  ReplicaSpaceUsage usage = 9; // replica space usage
+  repeated string allowed_hosts = 10; // host (nqn's) which are allowed to connect to the target
+  bool is_snapshot = 11; // true: snapshot false: normal replica
+  bool is_clone = 12; // true: clone replica from snapshot, false: normal replica
+  optional string snapshot_uuid = 13; // snapshot uuid from which the clone replica is created
+}
+
+message CreateReplicaRequest {
+  string name = 1;  // name of the replica
+  string uuid = 2;  // uuid of the replica
+  string pooluuid = 3;  // uuid of the pool on which replica needs to be created.
+  uint64 size = 4;  // size of the replica in bytes
+  bool thin = 5;    // thin provisioning
+  ShareProtocol share = 6;  // protocol to expose the replica over
+  repeated string allowed_hosts = 7; // host (nqn's) which are allowed to connect to the target.
+}
+
+// Destroy replica arguments.
+message DestroyReplicaRequest {
+  string uuid = 1;  // uuid of the replica.
+  oneof pool {
+    string pool_name = 2; // name of the pool where the replica resides.
+    string pool_uuid = 3; // optional uuid for the pool where the replica resides.
+  }
+}
+
+// Share replica request.
+message ShareReplicaRequest {
+  string uuid = 1;  // uuid of the replica
+  // protocol used for exposing the replica
+  ShareProtocol share = 2;
+  repeated string allowed_hosts = 3; // host (nqn's) which are allowed to connect to the target.
+}
+
+// Unshare replica request
+message UnshareReplicaRequest {
+  string uuid = 1;  // uuid of the replica
+}
+
+// List of replicas and their properties.
+message ListReplicasResponse {
+  repeated Replica replicas = 1;  // list of the replicas
+}
+
+message ListReplicaOptions {
+  google.protobuf.StringValue name = 1; // list the replica with the name if provided
+  google.protobuf.StringValue poolname = 2; // list the replicas on the provided pool, by name
+  google.protobuf.StringValue uuid = 3; // list the replica with the uuid if provided
+  google.protobuf.StringValue pooluuid = 4; // list the replicas on the provided pool, by uuid
+  Query query = 5; // list replica based on Query value
+
+  /// Query used for getting specific types of replicas. These are mutually exclusive, ex. a snapshot cannot be clone.
+  message Query {
+    bool replica = 1; // query for selecting or normal replica types.
+    bool snapshot = 2; // query for selecting or snapshot types.
+    bool clone = 3; // query for selecting or clone types.
+  }
+}

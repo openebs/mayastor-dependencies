@@ -1,0 +1,95 @@
+
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+package mayastor.v1;
+
+service PoolRpc {
+  // Storage pool related methods.
+  //
+  // Storage pool is made up of block devices disks and provides a storage
+  // space for provisioning of replicas.
+  rpc CreatePool (CreatePoolRequest) returns (Pool) {}
+  rpc DestroyPool (DestroyPoolRequest) returns (google.protobuf.Empty) {}
+  rpc ExportPool (ExportPoolRequest) returns (google.protobuf.Empty) {}
+  rpc ImportPool (ImportPoolRequest) returns (Pool) {}
+  rpc ListPools (ListPoolOptions) returns (ListPoolsResponse) {}
+}
+
+// Specifies the type of the pool
+enum PoolType {
+  Lvs = 0;  // pool backed by spdk lvs
+}
+
+// The wrapper for pooltype.
+// It helps in defining optional fields
+// when required.
+message PoolTypeValue {
+  PoolType value = 1;
+}
+
+// Create pool arguments.
+message CreatePoolRequest {
+  string name = 1;           // name of the pool
+  google.protobuf.StringValue uuid = 2; // optional uuid for the pool to be created
+  repeated string disks = 3; // disk device paths or URIs to be claimed by the pool
+  PoolType pooltype = 4;     // type of the pool
+  // Default cluster size is 4MiB (4 * 1024 * 1024), input cluster size must be in "bytes" but
+  // must be multiple of 1MiB, else default cluster size i.e 4MiB will be considered. Minimum
+  // cluster size can be input as 1048576 (1024 * 1024) bytes (1MiB)
+  optional uint32 cluster_size = 5;
+}
+
+// Create pool arguments.
+message ImportPoolRequest {
+  string name = 1;           // name of the pool
+  google.protobuf.StringValue uuid = 2; // optional uuid for the pool to be imported
+  repeated string disks = 3; // disk device paths or URIs to be claimed by the pool
+  PoolType pooltype = 4;     // type of the pool
+}
+
+// State of the storage pool (terminology comes from ZFS).
+enum PoolState {
+  POOL_UNKNOWN = 0;
+  POOL_ONLINE = 1;   // the pool is in normal working order
+  POOL_DEGRADED = 2; // the pool has experienced a failure but can still function
+  POOL_FAULTED = 3;  // the pool is completely inaccessible
+}
+
+// Storage pool properties
+message Pool {
+  string uuid = 1;            // uuid of the pool
+  string name = 2;            // name of the pool
+  repeated string disks = 3;  // absolute disk paths claimed by the pool
+  PoolState state = 4;        // current state of the pool
+  uint64 capacity = 5;        // size of the pool in bytes
+  uint64 used = 6;            // used bytes from the pool
+  PoolType pooltype = 7;      // type of the pool
+  uint64 committed = 8;       // committed size of all pool replicas (sum of capacities of all replicas)
+  uint32 cluster_size = 9;    // blobstor cluster size set (in bytes) during pool creation
+}
+
+// Destroy pool arguments.
+message DestroyPoolRequest {
+  string name = 1;  // name of the pool
+  google.protobuf.StringValue uuid = 2; // optional uuid for the pool to be destroyed
+}
+
+// Export pool arguments.
+message ExportPoolRequest {
+  string name = 1;  // name of the pool
+  google.protobuf.StringValue uuid = 2; // optional uuid for the pool to be exported
+}
+
+// List of pools and their properties.
+message ListPoolsResponse {
+  repeated Pool pools = 1;  // list of the pools
+}
+
+message ListPoolOptions {
+  google.protobuf.StringValue name = 1; // list the pools matching the name if provided
+  PoolTypeValue pooltype = 2; // optional pooltype filter
+  google.protobuf.StringValue uuid = 3; // get the pool matching the uuid if provided
+}
