@@ -37,6 +37,7 @@ enum EventAction {
   StateChange = 3;
   RebuildBegin = 4;
   RebuildEnd = 5;
+  SwitchOver = 6;
 }
 
 // Event meta data
@@ -65,6 +66,7 @@ enum Component {
   UnknownComponent = 0;
   CoreAgent = 1;
   IoEngine = 2;
+  HaClusterAgent = 3;
 }
 
 // Event message version
@@ -79,6 +81,8 @@ message EventDetails {
   optional RebuildEventDetails rebuild_details = 1;
   // Replica event details
   optional ReplicaEventDetails replica_details = 2;
+  // HA switch over event details
+  optional SwitchOverEventDetails switch_over_details = 3;
 }
 
 // Rebuild event details
@@ -115,4 +119,30 @@ message ReplicaEventDetails {
   string pool_uuid = 2;
   // Replica name
   string replica_name = 3;
+}
+
+// HA switch over event details
+message SwitchOverEventDetails {
+  // Switch over status
+  SwitchOverStatus switch_over_status = 1;
+  // Timestamp when switchover request was initialized
+  optional google.protobuf.Timestamp start_time = 2;
+  // Failed nexus path of the volume
+  string existing_nqn = 3;
+  // New nexus path of the volume
+  optional string new_path = 4;
+  // Number of failed attempts in the current Stage
+  uint64 retry_count = 5;
+}
+
+// Switch over status
+enum SwitchOverStatus {
+  // Unknown
+  UnknownSwitchOverStatus = 0;
+  // Switch over started
+  SwitchOverStarted = 1;
+  // Switch over is completed successfully
+  SwitchOverCompleted = 2;
+  // Switch over failed
+  SwitchOverFailed = 3;
 }

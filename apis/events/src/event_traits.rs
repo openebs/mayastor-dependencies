@@ -1,8 +1,8 @@
 use crate::event::{
     Component, EventDetails, EventMessage, EventMeta, EventSource, RebuildEventDetails,
-    RebuildStatus, ReplicaEventDetails, Version,
+    RebuildStatus, ReplicaEventDetails, SwitchOverEventDetails, SwitchOverStatus, Version,
 };
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
 use std::str::FromStr;
 
@@ -81,6 +81,35 @@ impl EventSource {
             ..self
         }
     }
+
+    /// Add HA swtich over event specific data to event source.
+    pub fn with_switch_over_data(
+        self,
+        status: SwitchOverStatus,
+        start_time: DateTime<Utc>, // switch over start time
+        existing_nqn: &str,        // failed nexus path of the volume
+        new_path: Option<String>,  // new nexus path of the volume
+        retry_count: u64,          // number of failed attempts in the current Stage
+    ) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                switch_over_details: Some(SwitchOverEventDetails {
+                    switch_over_status: status as i32,
+                    start_time: {
+                        match start_time.try_into() {
+                            Ok(time) => Some(time),
+                            Err(_) => None,
+                        }
+                    },
+                    existing_nqn: existing_nqn.to_string(),
+                    new_path,
+                    retry_count,
+                }),
+                ..Default::default()
+            }),
+            ..self
+        }
+    }
 }
 
 impl EventMessage {
@@ -98,6 +127,7 @@ impl FromStr for Component {
         match c {
             "agent-core" => Ok(Self::CoreAgent),
             "io-engine" => Ok(Self::IoEngine),
+            "agent-ha-cluster" => Ok(Self::HaClusterAgent),
             _ => Err(format!("Received event from unknown component {c}")),
         }
     }
