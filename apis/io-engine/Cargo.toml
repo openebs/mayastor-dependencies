@@ -12,7 +12,7 @@ tonic = "0.10.2"
 bytes = "1.5.0"
 prost = "0.12.1"
 prost-derive = "0.12.1"
-prost-wkt-types = "0.5.0"
+prost-extend = { path = "../../prost-extend" }
 prost-types = "0.12.1"
 serde = { version = "1.0.188", features = ["derive"] }
 serde_derive = "1.0.188"

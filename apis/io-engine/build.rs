@@ -4,21 +4,21 @@ extern crate tonic_build;
 
 fn main() {
     let reflection_descriptor =
-        PathBuf::from(env::var("OUT_DIR").unwrap()).join("mayastor_reflection.bin");
+        PathBuf::from(env::var("OUT_DIR").unwrap()).join("io_engine_reflection.bin");
     tonic_build::configure()
         .file_descriptor_set_path(&reflection_descriptor)
         .build_server(true)
         .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
-        .extern_path(".google.protobuf.Timestamp", "::prost_wkt_types::Timestamp")
+        .extern_path(".google.protobuf.Timestamp", "::prost_extend::Timestamp")
         .compile(&["protobuf/mayastor.proto"], &["protobuf"])
-        .unwrap_or_else(|e| panic!("mayastor protobuf compilation failed: {}", e));
+        .unwrap_or_else(|e| panic!("io-engine protobuf compilation failed: {}", e));
 
     tonic_build::configure()
         .file_descriptor_set_path(&reflection_descriptor)
         .build_server(true)
         .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
-        .extern_path(".google.protobuf.Timestamp", "::prost_wkt_types::Timestamp")
-        .extern_path(".google.protobuf.Duration", "::prost_wkt_types::Duration")
+        .extern_path(".google.protobuf.Timestamp", "::prost_extend::Timestamp")
+        .extern_path(".google.protobuf.Duration", "::prost_extend::Duration")
         .compile(
             &[
                 "protobuf/v1/bdev.proto",
@@ -33,5 +33,5 @@ fn main() {
             ],
             &["protobuf/v1"],
         )
-        .unwrap_or_else(|e| panic!("mayastor v1 protobuf compilation failed: {}", e));
+        .unwrap_or_else(|e| panic!("io-engine v1 protobuf compilation failed: {}", e));
 }
