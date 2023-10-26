@@ -38,6 +38,8 @@ enum EventAction {
   RebuildBegin = 4;
   RebuildEnd = 5;
   SwitchOver = 6;
+  AddChild = 7;
+  RemoveChild = 8;
 }
 
 // Event meta data
@@ -83,6 +85,8 @@ message EventDetails {
   optional ReplicaEventDetails replica_details = 2;
   // HA switch over event details
   optional SwitchOverEventDetails switch_over_details = 3;
+  // Nexus child event details
+  optional NexusChildEventDetails nexus_child_details = 4;
 }
 
 // Rebuild event details
@@ -145,4 +149,10 @@ enum SwitchOverStatus {
   SwitchOverCompleted = 2;
   // Switch over failed
   SwitchOverFailed = 3;
+}
+
+// Nexus child event details
+message NexusChildEventDetails {
+  // Nexus child uri
+  string uri = 1;
 }

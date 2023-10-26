@@ -1,6 +1,7 @@
 use crate::event::{
-    Component, EventDetails, EventMessage, EventMeta, EventSource, RebuildEventDetails,
-    RebuildStatus, ReplicaEventDetails, SwitchOverEventDetails, SwitchOverStatus, Version,
+    Component, EventDetails, EventMessage, EventMeta, EventSource, NexusChildEventDetails,
+    RebuildEventDetails, RebuildStatus, ReplicaEventDetails, SwitchOverEventDetails,
+    SwitchOverStatus, Version,
 };
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
@@ -104,6 +105,19 @@ impl EventSource {
                     existing_nqn: existing_nqn.to_string(),
                     new_path,
                     retry_count,
+                }),
+                ..Default::default()
+            }),
+            ..self
+        }
+    }
+
+    /// Add nexus child event specific data to event source.
+    pub fn with_nexus_child_data(self, uri: &str) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                nexus_child_details: Some(NexusChildEventDetails {
+                    uri: uri.to_string(),
                 }),
                 ..Default::default()
             }),
