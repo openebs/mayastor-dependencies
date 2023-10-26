@@ -10,5 +10,5 @@ tonic-build = "0.10.2"
 
 [dependencies]
 chrono = "0.4.26"
-serde = "1.0.183"
+serde = { version = "1.0.183", features = [ "derive" ] }
 prost = "0.12.1"

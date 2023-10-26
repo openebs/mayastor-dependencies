@@ -8,7 +8,14 @@ use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use crate::Timestamp;
 
 const NANOS_PER_SECOND: i32 = 1_000_000_000;
-//const NANOS_MAX: i32 = NANOS_PER_SECOND - 1;
+
+impl fmt::Display for Timestamp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.date_time_utc()
+            .to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)
+            .fmt(f)
+    }
+}
 
 impl Timestamp {
     /// Normalizes the timestamp to a canonical format.
@@ -60,14 +67,19 @@ impl TryFrom<Timestamp> for DateTime<Utc> {
     fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
         let mut value = value;
         // A call to `normalize` should capture all out-of-bound situations hopefully
-        // ensuring a panic never happens! Ideally this implementation should be
-        // deprecated in favour of TryFrom but unfortunately having `TryFrom` along with
-        // `From` causes a conflict.
+        // ensuring an error never happens!
         value.normalize();
         match DateTime::<Utc>::from_timestamp(value.seconds, value.nanos as u32) {
             Some(datetime) => Ok(datetime),
             None => Err("Invalid or out-of-range timestamp"),
         }
+    }
+}
+
+/// Converts proto timestamp to chrono's DateTime<Utc>.
+impl Timestamp {
+    fn date_time_utc(&self) -> DateTime<Utc> {
+        DateTime::<Utc>::try_from(self.clone()).expect("invalid or out-of-range datetime")
     }
 }
 
