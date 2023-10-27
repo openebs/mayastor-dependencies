@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+package mayastor.v1;
+
+// Service to be used by test code, it is not meant to be used in production!
+service TestRpc {
+  // Replica related methods.
+  //
+  // Wipe a replica using the selected method.
+  // The replica MUST NOT have any user data and must not be currently used
+  // by any nexus => this will cause data loss!
+  rpc WipeReplica (WipeReplicaRequest) returns (stream WipeReplicaResponse) {}
+
+  //
+  // Fault injection methods.
+  //
+  // Add a fault injection.
+  rpc AddFaultInjection (AddFaultInjectionRequest) returns (google.protobuf.Empty) {}
+
+  // Remove a fault injection.
+  rpc RemoveFaultInjection (RemoveFaultInjectionRequest) returns (google.protobuf.Empty) {}
+
+  // List existing fault injections.
+  rpc ListFaultInjections (ListFaultInjectionsRequest) returns (ListFaultInjectionsReply) {}
+}
+
+message WipeReplicaRequest {
+  // Uuid of the replica.
+  string                     uuid = 1;
+  oneof pool {
+    // Name of the pool where the replica resides.
+    string              pool_name = 2;
+    // Optional uuid for the pool where the replica resides.
+    string              pool_uuid = 3;
+  }
+  StreamWipeOptions  wipe_options = 4;
+}
+
+message WipeOptions {
+  enum WipeMethod {
+    // Don't actually wipe, just pretend.
+    NONE                        = 0;
+    // Wipe by writing zeroes.
+    WRITE_ZEROES                = 1;
+    // Wipe by sending unmap/trim.
+    UNMAP                       = 2;
+    // Wipe by writing a given patter (see write_pattern(6) field).
+    WRITE_PATTERN               = 3;
+  }
+  // Method used to wipe the bdev.
+  WipeMethod        wipe_method = 1;
+  // When using WRITE_PATTERN, wipe using this 32bit write pattern
+  // Default: 0xDEADBEEF.
+  optional uint32 write_pattern = 2;
+}
+
+message StreamWipeOptions {
+  WipeOptions       options = 1;
+  // Notify client when every chunk is complete.
+  uint64         chunk_size = 2;
+}
+
+// Stream of messages which are sent from the server to the client.
+// A message is sent at the beginning, then a message will be sent after
+// each chunk sized bytes are wiped.
+// In case of successful wipes this brings the total number of messages
+// to total_chunks + 1.
+message WipeReplicaResponse {
+  // Uuid of the replica.
+  string                    uuid = 1;
+  // Total bytes to be wiped.
+  uint64             total_bytes = 2;
+  // Size of a chunk.
+  uint64              chunk_size = 3;
+  // Size of the last chunk (may differ in case of non multiple of the total size).
+  uint64         last_chunk_size = 4;
+  // Number of chunks (how many notifications -1) to be received.
+  uint64            total_chunks = 5;
+  // How many bytes we've wiped so far (this will be incremented in chunks).
+  uint64             wiped_bytes = 6;
+  // How many chunks we've wiped so far.
+  uint64            wiped_chunks = 7;
+  // Remaining bytes to be wiped.
+  uint64         remaining_bytes = 8;
+  // Duration since the start of the wipe.
+  google.protobuf.Duration since = 9;
+}
+
+message FaultInjection {
+  // URI that was used to add the fault injection.
+  string uri = 1;
+  // Target device name to which the injection applies.
+  string device_name = 2;
+  // True if the injection is currently active (injection active condition
+  // has been met).
+  bool is_active = 3;
+}
+
+message AddFaultInjectionRequest {
+  // URI that defines injection target and parameters.
+  string uri = 1;
+}
+
+message RemoveFaultInjectionRequest {
+  // URI that was used to add the fault injection.
+  string uri = 1;
+}
+
+  message ListFaultInjectionsRequest {
+}
+
+message ListFaultInjectionsReply {
+  repeated FaultInjection injections = 1;
+}

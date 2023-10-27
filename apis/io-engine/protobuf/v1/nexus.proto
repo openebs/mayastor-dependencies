@@ -1,0 +1,370 @@
+syntax = "proto3";
+
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/empty.proto";
+import "common.proto";
+
+package mayastor.v1;
+
+import "google/protobuf/timestamp.proto";
+
+service NexusRpc {
+  // Nexus related methods.
+  //
+  // Nexus is a logical frontend representing a data volume taking care of
+  // replication and rebuild in the background.
+
+  rpc CreateNexus (CreateNexusRequest) returns (CreateNexusResponse) {}
+  rpc DestroyNexus (DestroyNexusRequest) returns (google.protobuf.Empty) {}
+  rpc ListNexus (ListNexusOptions) returns (ListNexusResponse) {}
+  rpc AddChildNexus (AddChildNexusRequest) returns (AddChildNexusResponse) {}
+  rpc RemoveChildNexus (RemoveChildNexusRequest) returns (RemoveChildNexusResponse) {}
+
+  // take a child offline permanently; exactly the same ChildOperation OfflinePermanent
+  rpc FaultNexusChild (FaultNexusChildRequest) returns (FaultNexusChildResponse) {}
+
+  rpc ShutdownNexus (ShutdownNexusRequest) returns (ShutdownNexusResponse) {}
+
+  // This method is called by control plane to construct a block device
+  // (/dev/...) that will be used to connect the nexus to the OS.
+  rpc PublishNexus (PublishNexusRequest) returns (PublishNexusResponse) {}
+  rpc UnpublishNexus (UnpublishNexusRequest) returns (UnpublishNexusResponse) {}
+
+  // NVMe ANA state
+  rpc GetNvmeAnaState (GetNvmeAnaStateRequest) returns (GetNvmeAnaStateResponse) {}
+  rpc SetNvmeAnaState (SetNvmeAnaStateRequest) returns (SetNvmeAnaStateResponse) {}
+
+  // Nexus child operations
+  rpc ChildOperation(ChildOperationRequest) returns (ChildOperationResponse) {}
+
+  // Rebuild operations
+  rpc StartRebuild (StartRebuildRequest) returns (StartRebuildResponse) {}
+  rpc StopRebuild (StopRebuildRequest) returns (StopRebuildResponse) {}
+  rpc PauseRebuild (PauseRebuildRequest) returns (PauseRebuildResponse) {}
+  rpc ResumeRebuild (ResumeRebuildRequest) returns (ResumeRebuildResponse) {}
+  rpc GetRebuildState (RebuildStateRequest) returns (RebuildStateResponse) {}
+  rpc GetRebuildStats (RebuildStatsRequest) returns (RebuildStatsResponse) {}
+  rpc GetRebuildHistory (RebuildHistoryRequest) returns (RebuildHistoryResponse) {}
+  rpc ListRebuildHistory (ListRebuildHistoryRequest) returns (ListRebuildHistoryResponse) {}
+
+}
+
+// Create nexus arguments.
+message CreateNexusRequest {
+  string name = 1; // name of the nexus
+  string uuid = 2; // UUID of the nexus
+  uint64 size = 3; // size of the device in bytes
+  uint32 minCntlId = 4;  // minimum NVMe controller ID
+  uint32 maxCntlId = 5;  // maximum NVMe controller ID
+  uint64 resvKey = 6;    // NVMe reservation key for children
+  uint64 preemptKey = 7; // NVMe preempt key for children
+  repeated string children = 8; // uris to the targets we connect to
+  string nexusInfoKey = 9; // the key to use to persist the nexus info structure
+  optional NvmeReservation resvType = 10; // the reservation type to use
+  NexusNvmePreemption preemptPolicy = 11; // the preemption policy to use
+}
+
+/// Nexus NVMe preemption policy.
+enum NexusNvmePreemption {
+  ArgKey = 0; // preempts using the preemptKey argument, if any
+  Holder = 1; // preempts the current reservation holder, if any
+}
+
+/// NVMe reservation types.
+enum NvmeReservation {
+  Reserved = 0;
+  WriteExclusive = 1;
+  ExclusiveAccess = 2;
+  WriteExclusiveRegsOnly = 3;
+  ExclusiveAccessRegsOnly = 4;
+  WriteExclusiveAllRegs = 5;
+  ExclusiveAccessAllRegs = 6;
+}
+
+// State of the nexus child.
+enum ChildState {
+  CHILD_STATE_UNKNOWN = 0;  // no particular reason for the child to be in this state; this is typically the init state
+  CHILD_STATE_ONLINE = 1;   // healthy and contains the latest bits
+  CHILD_STATE_DEGRADED = 2; // rebuild is in progress (or other recoverable error)
+  CHILD_STATE_FAULTED = 3;  // unrecoverable error (control plane must act)
+}
+
+// State of the nexus child.
+enum ChildStateReason {
+  CHILD_STATE_REASON_NONE = 0;            // reason for CHILD_REASON_NONE, CHILD_UNKNOWN
+  CHILD_STATE_REASON_INIT = 1;            // child is being initialized
+  CHILD_STATE_REASON_CLOSED = 2;          // child is being destroyed or has been closed
+  CHILD_STATE_REASON_CANNOT_OPEN = 3;     // failed to open child (e.g. cannot access device)
+  CHILD_STATE_REASON_CONFIG_INVALID = 4;  // invalid child device configuration (e.g. mismatching size)
+  CHILD_STATE_REASON_REBUILD_FAILED = 5;  // rebuild operation failed for this child
+  CHILD_STATE_REASON_IO_FAILURE = 6;      // child faulted because of other I/O errors
+  CHILD_STATE_REASON_BY_CLIENT = 7;       // child has been faulted by a client
+  CHILD_STATE_REASON_OUT_OF_SYNC = 8;     // child is being rebuilt
+  CHILD_STATE_REASON_NO_SPACE = 9;        // child faulted because I/O operation failed with ENOSPC
+  CHILD_STATE_REASON_TIMED_OUT = 10;      // child faulted because I/O operation failed with timeout
+  CHILD_STATE_REASON_ADMIN_FAILED = 11;   // child faulted of an admin command failure
+}
+
+// represents a child device part of a nexus
+message Child {
+  string uri = 1;                     // uri of the child device
+  ChildState state = 2;               // state of the child
+  ChildStateReason state_reason = 3;  // child state reason
+  int32 rebuild_progress = 4;         // rebuild progress
+  optional string device_name = 5;    // child device name
+  google.protobuf.Timestamp fault_timestamp = 6;   // timestamp(UTC) when child went faulted
+  bool has_io_log = 7;                // true if the child has an active I/O log
+}
+
+// State of the nexus (terminology inspired by ZFS).
+enum NexusState {
+  NEXUS_UNKNOWN = 0;
+  NEXUS_ONLINE = 1;        // healthy and working
+  NEXUS_DEGRADED = 2;      // not healthy but is able to serve IO (i.e. rebuild is in progress)
+  NEXUS_FAULTED = 3;       // broken and unable to serve IO
+  NEXUS_SHUTTING_DOWN = 4; // shutdown in progress: not able to serve I/O
+  NEXUS_SHUTDOWN = 5;      // shutdown complete: not able to serve I/O
+}
+
+enum NvmeAnaState {
+  NVME_ANA_INVALID_STATE = 0;           // invalid, do not use
+  NVME_ANA_OPTIMIZED_STATE = 0x1;
+  NVME_ANA_NON_OPTIMIZED_STATE = 0x2;
+  NVME_ANA_INACCESSIBLE_STATE = 0x3;
+  NVME_ANA_PERSISTENT_LOSS_STATE = 0x4; // not yet supported
+  NVME_ANA_CHANGE_STATE = 0xF;          // not yet supported
+}
+
+// represents a nexus device
+message Nexus {
+  string name = 1;             // name of the nexus
+  string uuid = 2;             // UUID of the bdev
+  uint64 size = 3;             // size of the volume in bytes
+  NexusState state = 4;        // current state of the nexus
+  repeated Child children = 5; // array of children
+  // URI of the device for the volume (missing if not published).
+  // Missing property and empty string are treated the same.
+  string device_uri = 6;
+  uint32 rebuilds = 7;         // total number of rebuild tasks
+  NvmeAnaState ana_state = 8;  // Nexus ANA state.
+  repeated string allowed_hosts = 9; // host (nqn's) which are allowed to connect to the target
+}
+
+message CreateNexusResponse {
+  Nexus nexus = 1;
+}
+
+message AddChildNexusResponse {
+  Nexus nexus = 1;
+}
+
+message RemoveChildNexusResponse {
+  Nexus nexus = 1;
+}
+
+message UnpublishNexusResponse {
+  Nexus nexus = 1;
+}
+
+message SetNvmeAnaStateResponse {
+  Nexus nexus = 1;
+}
+
+message ListNexusResponse {
+  repeated Nexus nexus_list = 1;
+}
+
+message DestroyNexusRequest   {
+  string uuid = 1;    // uuid of the nexus
+}
+
+message ShutdownNexusRequest   {
+  string uuid = 1;    // uuid of the nexus
+}
+
+message ShutdownNexusResponse   {
+  Nexus nexus = 1;
+}
+
+message AddChildNexusRequest {
+  string uuid = 1;    // uuid of the nexus
+  string uri = 2;     // URI of the child device to be added
+  bool norebuild = 3;   // auto start rebuilding
+}
+
+message RemoveChildNexusRequest {
+  string uuid = 1;    // uuid of the nexus
+  string uri = 2;     // URI of the child device to be removed
+}
+
+message FaultNexusChildRequest {
+  string uuid = 1;    // uuid of the nexus
+  string uri = 2;     // URI of the child device to be faulted
+}
+
+message FaultNexusChildResponse {
+  Nexus nexus = 1;
+}
+
+// this message will be subject to change as we will add support for remote
+// storage protocols.
+message PublishNexusRequest {
+  string uuid = 1; // uuid of the nexus which to create device for
+  string key = 2; // encryption key
+  ShareProtocol share = 3;  // protocol used for the front end.
+  repeated string allowed_hosts = 4; // host (nqn's) which are allowed to connect to the target.
+}
+
+message PublishNexusResponse {
+  Nexus nexus = 1;
+}
+
+message UnpublishNexusRequest {
+  string uuid = 1;   // uuid of the nexus which to destroy
+}
+
+message ListNexusOptions {
+  // list the nexuses matching the name if provided
+  google.protobuf.StringValue name = 1;
+  // list the nexus matching the uuid if provided
+  google.protobuf.StringValue uuid = 2;
+}
+
+message GetNvmeAnaStateRequest {
+  string uuid = 1;   // uuid of the nexus
+}
+
+message GetNvmeAnaStateResponse {
+  NvmeAnaState ana_state = 1;
+}
+
+message SetNvmeAnaStateRequest {
+  string uuid = 1;   // uuid of the nexus
+  NvmeAnaState ana_state = 2;
+}
+
+enum ChildAction {
+  Offline = 0;          // take a child offline, e.g. for maintenance
+  Online = 1;           // bring a child online which was previously offlined or faulted
+  FaultIOError = 2;     // fault a child with an I/O error (e.g. for testing/debug purposes)
+  OfflinePermanent = 3; // take a child offline permanently; exactly the same a legacy FaultNexusChild method
+}
+
+message ChildOperationRequest {
+  string nexus_uuid = 1; // uuid of the nexus
+  string uri = 2; // uri of the child to act upon
+  ChildAction action = 3;
+}
+
+message ChildOperationResponse {
+  Nexus nexus = 1;
+}
+
+message RebuildStateRequest {
+  string nexus_uuid = 1;  // uuid of the nexus
+  string uri = 2;   // uri of the destination child
+}
+
+message RebuildStateResponse {
+  string state = 1; // current rebuild state (i.e. ready/running/completed etc.)
+}
+
+message RebuildStatsRequest {
+  string nexus_uuid = 1;  // uuid of the nexus
+  string uri = 2;   // uri of the destination child
+}
+
+message RebuildStatsResponse {
+  uint64 blocks_total = 1;                    // total number of blocks to recover
+  uint64 blocks_recovered = 2;                // number of blocks already recovered
+  uint64 blocks_transferred = 8;              // number of blocks for which the actual data transfer already occurred
+  uint64 blocks_remaining = 9;                // number of blocks remaining to transfer
+  uint64 progress = 3;                        // rebuild progress %
+  uint64 blocks_per_task = 4;                 // granularity of each recovery task in blocks
+  uint64 block_size = 5;                      // size in bytes of logical block
+  uint64 tasks_total = 6;                     // total number of concurrent rebuild tasks
+  uint64 tasks_active = 7;                    // number of current active tasks
+  bool is_partial = 10;                       // true for partial (only modified blocked transferred); false for the full rebuild (all blocks transferred)
+  google.protobuf.Timestamp start_time = 11;  // start time of the rebuild (UTC)
+}
+
+enum RebuildJobState {
+  Init = 0;        // Initialized, not yet rebuilding
+  Rebuilding = 1;  // Running rebuild
+  Stopped = 2;     // Stopped rebuild
+  Paused = 3;      // Paused rebuild
+  Failed = 4;      // Failed for some reason
+  Completed = 5;   // Rebuild completed succesfully
+}
+
+message ListRebuildHistoryRequest {
+  optional uint32 count = 1; // Maximum of rebuild records to be returned per nexus.
+  optional google.protobuf.Timestamp since_end_time = 2; // List records with an end_time starting from this timestamp.
+}
+
+message RebuildHistoryRequest {
+  string uuid = 1;  // uuid of the nexus
+}
+
+message ListRebuildHistoryResponse {
+  map<string, RebuildHistoryResponse> histories = 1; // Map of Nexus Id and its rebuild history.
+  google.protobuf.Timestamp            end_time = 2; // Newest end_time record. Next List call can use this as since_end_time.
+}
+
+message RebuildHistoryResponse {
+  string uuid = 1;                           // uuid of the nexus
+  string name = 3;                           // name of the nexus
+  repeated RebuildHistoryRecord records = 2; // List of all the rebuild records
+                                             // across all the replicas
+}
+
+message RebuildHistoryRecord {
+  string child_uri = 1;                      // URI of the rebuilt child (destination)
+  string src_uri = 2;                        // URI of the source replica
+  RebuildJobState state = 3;                 // final state of the rebuild job
+  uint64 blocks_total = 4;                   // total number of blocks of the replicas
+  uint64 blocks_recovered = 5;               // number of blocks recovered
+  uint64 blocks_transferred = 6;             // number of blocks for which the actual data transfer occurred
+  uint64 blocks_remaining = 7;               // number of blocks remaining to transfer
+  uint64 blocks_per_task = 8;                // granularity of each recovery task in blocks
+  uint64 block_size = 9;                     // size in bytes of logical block
+  bool is_partial = 10;                      // true for partial (only modified blocked transferred); false for the full rebuild (all blocks transferred)
+  google.protobuf.Timestamp start_time = 11; // start time of the rebuild (UTC)
+  google.protobuf.Timestamp end_time = 12;   // end time of the rebuild (UTC)
+}
+
+message StartRebuildRequest {
+  string nexus_uuid = 1;  // uuid of the nexus
+  string uri = 2;   // uri of the child to be rebuilt
+}
+
+message StartRebuildResponse {
+  Nexus nexus = 1;
+}
+
+message StopRebuildRequest {
+  string nexus_uuid = 1;  // uuid of the nexus
+  string uri = 2;   // uri of the destination child
+}
+
+message StopRebuildResponse {
+  Nexus nexus = 1;
+}
+
+message PauseRebuildRequest {
+  string nexus_uuid = 1;  // uuid of the nexus
+  string uri = 2;   // uri of the destination child
+}
+
+message PauseRebuildResponse {
+  Nexus nexus = 1;
+}
+
+message ResumeRebuildRequest {
+  string nexus_uuid = 1;  // uuid of the nexus
+  string uri = 2;   // uri of the destination child
+}
+
+message ResumeRebuildResponse {
+  Nexus nexus = 1;
+}

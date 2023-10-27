@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+import "replica.proto";
+import "nexus.proto";
+package mayastor.v1;
+
+service SnapshotRpc {
+    // Common snapshot related methods.
+    rpc CreateReplicaSnapshot(CreateReplicaSnapshotRequest) returns (CreateReplicaSnapshotResponse) {}
+    rpc CreateNexusSnapshot(NexusCreateSnapshotRequest) returns (NexusCreateSnapshotResponse) {}
+    rpc ListSnapshot(ListSnapshotsRequest) returns (ListSnapshotsResponse) {}
+    rpc DestroySnapshot(DestroySnapshotRequest) returns (google.protobuf.Empty) {}
+    rpc CreateSnapshotClone(CreateSnapshotCloneRequest) returns (Replica) {}
+    rpc ListSnapshotClone(ListSnapshotCloneRequest) returns (ListSnapshotCloneResponse) {}
+}
+
+// Parameter details of a single snapshot
+message SnapshotInfo {
+    string snapshot_uuid = 1; // uuid of the snapshot
+    string snapshot_name = 2; // name of the snapshot
+    uint64 snapshot_size = 3; // amount of bytes referenced by snapshot
+    uint64 num_clones = 4; // number of clones created from this snapshot
+    google.protobuf.Timestamp timestamp = 5; // snapshot creation_timestamp
+    string source_uuid = 6; // uuid of the source from which snapshot is created (nexus / replica)
+    uint64 source_size = 7; // amount of bytes referenced by source
+    string pool_uuid = 8; // pool UUID in which snapshot is present
+    string pool_name = 9; // pool name in which snapshot is present
+    string entity_id = 10; // uuid of the entity for which snapshot is taken.
+    string txn_id = 11; // unique transaction id for snapshot.
+    bool valid_snapshot = 12; // true: valid, false: invalid (missing one/more snapshot descriptor field i.e. txn_id, entity_id, source_uuid
+    bool ready_as_source = 13; // ready for usage, i,e source for another volume.
+    uint64 referenced_bytes = 14; // amount of bytes referenced by all successor snapshots.
+    bool discarded_snapshot = 15; // true: snapshot is marked as discarded. false: Valid Snapshot
+}
+
+// Request parameters to list snapshot.
+message ListSnapshotsRequest {
+    optional string source_uuid = 1;  // source uuid from which snapshot is taken
+    optional string snapshot_uuid = 2; // snapshot uuid for which the detail can be listed
+    Query query = 3; // list snapshot based on Query's inner field values if some.
+
+    // Query is used to filter snapshots in list snapshot response based on it's inner field values if some.
+    message Query {
+        optional bool invalid = 1; // Filter based on invalid if some.
+        optional bool discarded = 2; // Filter based on discarded if some.
+    }
+}
+
+// List Snapshot Response.
+message ListSnapshotsResponse {
+    repeated SnapshotInfo snapshots = 1; // list of Snapshot Params.
+}
+// Delete Snapshot Request.
+message DestroySnapshotRequest {
+    string snapshot_uuid = 1; // snapshot to be deleted
+    oneof pool {
+        string pool_name = 2; // name of the pool where the snapshot resides.
+        string pool_uuid = 3; // optional uuid for the pool where the snapshot resides.
+    }
+}
+// Create Replica Snapshot Request.
+message CreateReplicaSnapshotRequest {
+    string replica_uuid = 1;  // uuid of the replica
+    string snapshot_uuid = 2; // uuid of the snapshot
+    string snapshot_name = 3; // snapshot name
+    string entity_id = 4;     // entity associated with this snapshot
+    string txn_id = 5; // unique transaction id generate for snapshot creation
+}
+
+/// Create Replica Snapshot Response.
+message CreateReplicaSnapshotResponse {
+    string replica_uuid = 1; // UUID of the source replica
+    SnapshotInfo snapshot = 2; // Snapshot detail information
+}
+
+// Request parameter for Nexus Snapshot Create.
+message NexusCreateSnapshotRequest {
+    string nexus_uuid = 1;     // uuid of the nexus
+    string entity_id = 2;      // entity associated with this snapshot
+    string txn_id = 3;         // transaction id of the snapshot
+    string snapshot_name = 4;  // name of the snapshot
+    repeated NexusCreateSnapshotReplicaDescriptor replicas = 5; // replicas that participate in snapshot operation
+}
+message NexusCreateSnapshotReplicaDescriptor {
+    string replica_uuid = 1;           // uuid of the replica
+    optional string snapshot_uuid = 2; // uuid of the snapshot (can be omitted if replica is skipped)
+    bool skip = 3;                     // skip this replica
+}
+// Response parameter for Nexus Snapshot Create.
+message NexusCreateSnapshotResponse {
+    Nexus nexus = 1;                                             // nexus descriptor
+    google.protobuf.Timestamp snapshot_timestamp = 2;            // snapshot creation timestamp
+    repeated NexusCreateSnapshotReplicaStatus replicas_done = 3; // status for replicas that participated in nexus snapshot operation
+    repeated string replicas_skipped = 4;                        // replicas that did not participate in nexus snapshot operation (uuids)
+}
+
+message NexusCreateSnapshotReplicaStatus {
+    string replica_uuid = 1; // uuid of the replica
+    uint32 status_code = 2;  // snapshot operation status (0 means successful completion)
+}
+
+// Request Parameters for Creating Snapshot Clone.
+message CreateSnapshotCloneRequest {
+    string snapshot_uuid = 1; // uuid of the snapshot
+    string clone_name = 2; // snapshot clone name
+    string clone_uuid = 3; // uuid of the clone to be created from snapshot
+}
+
+// Request Parameters for List Snapshot Clone.
+message ListSnapshotCloneRequest {
+    optional string snapshot_uuid = 1; // if snapshot uuid is present, return snapshot specific clone, else return all clones
+}
+// Response Parameters for List Snapshot Clone.
+message ListSnapshotCloneResponse {
+  repeated Replica replicas = 1;  // list of the replicas
+}

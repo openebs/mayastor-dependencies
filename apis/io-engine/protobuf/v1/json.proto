@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package mayastor.v1;
+
+service JsonRpc {
+  // Call a (SPDK) json-rpc method
+  rpc JsonRpcCall (JsonRpcRequest) returns (JsonRpcResponse) {}
+}
+
+message JsonRpcRequest {
+  string method = 1;
+  string params = 2;
+}
+
+message JsonRpcResponse {
+  string result = 1;
+}

@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package mayastor.v1;
+
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/empty.proto";
+import "common.proto";
+
+// Service to operate directly on block devices
+service BdevRpc {
+  // create a new block device using a uri scheme
+  rpc Create(CreateBdevRequest) returns (CreateBdevResponse) {}
+  // destroys the block device
+  rpc Destroy(DestroyBdevRequest) returns (google.protobuf.Empty) {}
+  // list the block devices
+  rpc List(ListBdevOptions) returns (ListBdevResponse) {}
+  // share the block device
+  rpc Share(BdevShareRequest) returns (BdevShareResponse) {}
+  // unshare the block device
+  rpc Unshare(BdevUnshareRequest) returns (google.protobuf.Empty) {}
+}
+
+message ListBdevOptions {
+  google.protobuf.StringValue name = 1;
+}
+
+message CreateBdevRequest {
+  string uri = 1;
+}
+
+message CreateBdevResponse {
+  Bdev bdev = 1;
+}
+
+message DestroyBdevRequest {
+  string uri = 1;
+}
+
+message Bdev {
+  // name of the bdev
+  string name = 1;
+  // the UUID which may or may not persist across restarts
+  string uuid = 2;
+  // the number of blocks
+  uint64 num_blocks = 3;
+  // the size of each block
+  uint32 blk_size = 5;
+  // if the device is used by some other subsystem
+  bool claimed = 6;
+  // the subsystem who uses the device
+  string claimed_by = 7;
+  // any aliases the device uses
+  string aliases = 8;
+  // the URI the device was created from
+  string uri = 9;
+  // the product name of the device
+  string product_name = 10;
+  // the URI on which the device is exported
+  string share_uri = 11;
+}
+
+message ListBdevResponse {
+  repeated Bdev bdevs = 1;
+}
+
+message BdevShareRequest {
+  // name of the bdev to share
+  string name = 1;
+  // the protocol to use
+  ShareProtocol protocol = 2;
+  repeated string allowed_hosts = 3; // host (nqn's) which are allowed to connect to the target.
+}
+
+message BdevShareResponse {
+  Bdev bdev = 1;
+}
+
+message BdevUnshareRequest {
+  // name of the bdev to unshare
+  string name = 1;
+}

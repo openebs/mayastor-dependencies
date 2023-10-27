@@ -14,3 +14,7 @@ Cargo.lock
 /package-lock.json
 /package.json
 /rust-git-version
+/rust-toolchain.toml
+.idea
+.vscode
+.pregenerated
