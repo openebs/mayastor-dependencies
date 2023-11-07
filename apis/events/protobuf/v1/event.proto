@@ -27,6 +27,7 @@ enum EventCategory {
   Replica = 4;
   Node = 5;
   HighAvailability = 6;
+  NvmePath = 7;
 }
 
 // Event Action
@@ -40,6 +41,9 @@ enum EventAction {
   SwitchOver = 6;
   AddChild = 7;
   RemoveChild = 8;
+  NvmePathSuspect = 9;
+  NvmePathFail = 10;
+  NvmePathFix = 11;
 }
 
 // Event meta data
@@ -69,6 +73,7 @@ enum Component {
   CoreAgent = 1;
   IoEngine = 2;
   HaClusterAgent = 3;
+  HaNodeAgent = 4;
 }
 
 // Event message version
@@ -87,6 +92,8 @@ message EventDetails {
   optional SwitchOverEventDetails switch_over_details = 3;
   // Nexus child event details
   optional NexusChildEventDetails nexus_child_details = 4;
+  // Nvme path event details
+  optional NvmePathEventDetails nvme_path_details = 5;
 }
 
 // Rebuild event details
@@ -155,4 +162,10 @@ enum SwitchOverStatus {
 message NexusChildEventDetails {
   // Nexus child uri
   string uri = 1;
+}
+
+// Nvme path event details
+message NvmePathEventDetails {
+  string nqn = 1;
+  string path = 2;
 }

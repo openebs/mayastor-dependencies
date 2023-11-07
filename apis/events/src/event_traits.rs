@@ -1,7 +1,7 @@
 use crate::event::{
     Component, EventDetails, EventMessage, EventMeta, EventSource, NexusChildEventDetails,
-    RebuildEventDetails, RebuildStatus, ReplicaEventDetails, SwitchOverEventDetails,
-    SwitchOverStatus, Version,
+    NvmePathEventDetails, RebuildEventDetails, RebuildStatus, ReplicaEventDetails,
+    SwitchOverEventDetails, SwitchOverStatus, Version,
 };
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
@@ -124,6 +124,20 @@ impl EventSource {
             ..self
         }
     }
+
+    /// Add nvme path event specific data to event source.
+    pub fn with_nvme_path_data(self, nqn: &str, path: &str) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                nvme_path_details: Some(NvmePathEventDetails {
+                    nqn: nqn.to_string(),
+                    path: path.to_string(),
+                }),
+                ..Default::default()
+            }),
+            ..self
+        }
+    }
 }
 
 impl EventMessage {
@@ -142,6 +156,7 @@ impl FromStr for Component {
             "agent-core" => Ok(Self::CoreAgent),
             "io-engine" => Ok(Self::IoEngine),
             "agent-ha-cluster" => Ok(Self::HaClusterAgent),
+            "agent-ha-node" => Ok(Self::HaNodeAgent),
             _ => Err(format!("Received event from unknown component {c}")),
         }
     }
