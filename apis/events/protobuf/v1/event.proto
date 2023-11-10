@@ -27,6 +27,7 @@ enum EventCategory {
   Replica = 4;
   Node = 5;
   HighAvailability = 6;
+  NvmePath = 7;
 }
 
 // Event Action
@@ -37,6 +38,12 @@ enum EventAction {
   StateChange = 3;
   RebuildBegin = 4;
   RebuildEnd = 5;
+  SwitchOver = 6;
+  AddChild = 7;
+  RemoveChild = 8;
+  NvmePathSuspect = 9;
+  NvmePathFail = 10;
+  NvmePathFix = 11;
 }
 
 // Event meta data
@@ -65,6 +72,8 @@ enum Component {
   UnknownComponent = 0;
   CoreAgent = 1;
   IoEngine = 2;
+  HaClusterAgent = 3;
+  HaNodeAgent = 4;
 }
 
 // Event message version
@@ -79,6 +88,12 @@ message EventDetails {
   optional RebuildEventDetails rebuild_details = 1;
   // Replica event details
   optional ReplicaEventDetails replica_details = 2;
+  // HA switch over event details
+  optional SwitchOverEventDetails switch_over_details = 3;
+  // Nexus child event details
+  optional NexusChildEventDetails nexus_child_details = 4;
+  // Nvme path event details
+  optional NvmePathEventDetails nvme_path_details = 5;
 }
 
 // Rebuild event details
@@ -115,4 +130,42 @@ message ReplicaEventDetails {
   string pool_uuid = 2;
   // Replica name
   string replica_name = 3;
+}
+
+// HA switch over event details
+message SwitchOverEventDetails {
+  // Switch over status
+  SwitchOverStatus switch_over_status = 1;
+  // Timestamp when switchover request was initialized
+  optional google.protobuf.Timestamp start_time = 2;
+  // Failed nexus path of the volume
+  string existing_nqn = 3;
+  // New nexus path of the volume
+  optional string new_path = 4;
+  // Number of failed attempts in the current Stage
+  uint64 retry_count = 5;
+}
+
+// Switch over status
+enum SwitchOverStatus {
+  // Unknown
+  UnknownSwitchOverStatus = 0;
+  // Switch over started
+  SwitchOverStarted = 1;
+  // Switch over is completed successfully
+  SwitchOverCompleted = 2;
+  // Switch over failed
+  SwitchOverFailed = 3;
+}
+
+// Nexus child event details
+message NexusChildEventDetails {
+  // Nexus child uri
+  string uri = 1;
+}
+
+// Nvme path event details
+message NvmePathEventDetails {
+  string nqn = 1;
+  string path = 2;
 }
