@@ -5,13 +5,13 @@ use error::{
 };
 use glob::glob;
 use snafu::ResultExt;
-use std::{fs::OpenOptions, io::Write, path::Path, str::FromStr};
+use std::{collections::HashMap, fs::OpenOptions, io::Write, path::Path, str::FromStr};
 
 pub const SYSFS_NVME_CTRLR_PREFIX: &str = "/sys/devices/virtual/nvme-fabrics/ctl";
 
 /// Subsystem struct shows us all the connect fabrics. This does not include
 /// NVMe devices that are connected by trtype=PCIe.
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Subsystem {
     /// Name of the subsystem.
     pub name: String,
@@ -23,25 +23,113 @@ pub struct Subsystem {
     pub state: String,
     /// The transport type being used (tcp or RDMA).
     pub transport: String,
-    /// Address contains traddr=X,trsvcid=Y.
-    pub address: String,
+    /// Address contains a comma-separated list of `SubsystemAddrToken`.
+    /// Example: traddr=X,trsvcid=Y.
+    pub address: SubsystemAddr,
     /// Serial number.
     pub serial: String,
     /// Model number.
     pub model: String,
 }
 
-/// Wrapper structure that creates subsystem addr string.
+const TR_ADDR: &str = "traddr";
+const TR_SVC_ID: &str = "trsvcid";
+const SRC_ADDR: &str = "src_addr";
+
+#[derive(Debug, Clone)]
+#[allow(unused)]
+enum SubsystemAddrToken {
+    TrAddr { traddr: String },
+    TrSvcId { trsvcid: String },
+    SrcAddr { src_addr: String },
+    Unknown { key: String, value: String },
+}
+impl From<(&str, &str)> for SubsystemAddrToken {
+    fn from((key, value): (&str, &str)) -> Self {
+        let value = value.to_string();
+        match key {
+            TR_ADDR => Self::TrAddr { traddr: value },
+            TR_SVC_ID => Self::TrSvcId { trsvcid: value },
+            SRC_ADDR => Self::SrcAddr { src_addr: value },
+            unknown => Self::Unknown {
+                key: unknown.to_string(),
+                value,
+            },
+        }
+    }
+}
+
+/// A slightly parsed version of `SubsystemAddr` containing the address tokens as variables
+/// making it easier to retrieve them.
+#[derive(Debug, Default, Clone)]
+pub struct SubsystemAddrExt {
+    tr_addr: Option<String>,
+    tr_svc_id: Option<String>,
+    src_addr: Option<String>,
+    unknowns: Vec<SubsystemAddrToken>,
+}
+
+impl SubsystemAddrExt {
+    /// Check if the subsystem address contains target port.
+    pub fn match_host_port(&self, host: &str, port: &str) -> bool {
+        self.tr_addr.as_deref() == Some(host) && self.tr_svc_id.as_deref() == Some(port)
+    }
+}
+
+impl From<SubsystemAddr> for SubsystemAddrExt {
+    fn from(value: SubsystemAddr) -> Self {
+        Self::from(value.0.as_str())
+    }
+}
+// This would be nice to do with serde, but for now let's not include serde in this crate
+impl From<&str> for SubsystemAddrExt {
+    fn from(value: &str) -> Self {
+        let raw_addr = value.split(',');
+        raw_addr.fold(SubsystemAddrExt::default(), |mut acc, addr| {
+            if let Some(pair) = addr.split_once('=') {
+                match SubsystemAddrToken::from(pair) {
+                    SubsystemAddrToken::TrAddr { traddr } => {
+                        acc.tr_addr = Some(traddr);
+                    }
+                    SubsystemAddrToken::TrSvcId { trsvcid } => {
+                        acc.tr_svc_id = Some(trsvcid);
+                    }
+                    SubsystemAddrToken::SrcAddr { src_addr } => {
+                        acc.src_addr = Some(src_addr);
+                    }
+                    addr @ SubsystemAddrToken::Unknown { .. } => acc.unknowns.push(addr),
+                }
+            }
+            acc
+        })
+    }
+}
+
+/// Wrapper over a raw subsystem address string.
+/// The address contains a comma-separated list of `SubsystemAddrToken`, example:
+/// traddr=10.1.0.2,trsvcid=8420.
+#[derive(Clone, Debug)]
 pub struct SubsystemAddr(String);
 
 impl SubsystemAddr {
-    /// New SubsystemAddr.
-    pub fn new(host: String, port: u16) -> SubsystemAddr {
-        SubsystemAddr(format!("traddr={host},trsvcid={port}"))
+    /// Check if the subsystem address contains target port.
+    pub fn match_host_port(&self, host: &str, port: &str) -> bool {
+        SubsystemAddrExt::from(self.as_str()).match_host_port(host, port)
+    }
+    /// Collect all address variants into a key-val map.
+    pub fn collect(&self) -> HashMap<&str, &str> {
+        self.0
+            .split(',')
+            .filter_map(|s| s.split_once('='))
+            .collect::<HashMap<&str, &str>>()
     }
     /// SubsystemAddr content as slice.
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+    /// SubsystemAddr content as raw String.
+    pub fn to_raw(self) -> String {
+        self.0
     }
 }
 
@@ -94,7 +182,7 @@ impl Subsystem {
             nqn,
             state,
             transport,
-            address,
+            address: SubsystemAddr(address),
             serial,
             model,
         })
@@ -156,13 +244,13 @@ impl Subsystem {
     /// Returns the particular subsystem based on the nqn and address.
     // TODO: Optimize this code.
     pub fn get(host: &str, port: &u16, nqn: &str) -> Result<Subsystem, NvmeError> {
-        let address = SubsystemAddr::new(host.to_string(), *port);
-
         let nvme_subsystems = NvmeSubsystems::new()?;
 
+        let host = host.to_string();
+        let sport = port.to_string();
         match nvme_subsystems
             .flatten()
-            .find(|subsys| subsys.nqn == *nqn && subsys.address == address)
+            .find(|subsys| subsys.nqn == *nqn && subsys.address.match_host_port(&host, &sport))
         {
             None => Err(NvmeError::SubsystemNotFound {
                 nqn: nqn.to_string(),
