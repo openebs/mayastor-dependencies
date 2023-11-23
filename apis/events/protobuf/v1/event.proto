@@ -44,6 +44,7 @@ enum EventAction {
   NvmePathSuspect = 9;
   NvmePathFail = 10;
   NvmePathFix = 11;
+  OnlineChild = 12;
 }
 
 // Event meta data
