@@ -14,7 +14,7 @@ mod pb {
     // to .pregenerated directory.
     // This has to be done every time Mayastor API V1 is changed.
     #[cfg(not(target_os = "linux"))]
-    include!("../.pregenerated/mayastor.v1.rs");
+    include!("../../../.pregenerated/mayastor.v1.rs");
 }
 
 pub mod common {

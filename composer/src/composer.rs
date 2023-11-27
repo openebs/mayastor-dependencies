@@ -3,6 +3,7 @@ use std::{
     ffi::{OsStr, OsString},
     net::Ipv4Addr,
     path::{Path, PathBuf},
+    sync::Mutex,
     thread,
     time::Duration,
 };
@@ -43,13 +44,26 @@ pub const TEST_NET_NAME: &str = "engine-testing-network";
 pub const TEST_LABEL_PREFIX: &str = "io.composer.test";
 pub const TEST_NET_NETWORK: &str = "10.1.0.0/16";
 
+/// Additional configuration.
+#[derive(Default, Debug)]
+struct AdditionalConfig {
+    /// Secondary target directory.
+    target_dir: Option<OsString>,
+    /// Additional binds.
+    binds: Vec<(String, String)>,
+    /// Additional components of PATH env var.
+    paths: Vec<String>,
+}
+
 static PROJECT_ROOT: OnceCell<PathBuf> = OnceCell::new();
+static ADDITIONAL_CONFIG: OnceCell<Mutex<AdditionalConfig>> = OnceCell::new();
 
 /// Initialize the composer with target project root.
 /// Must be called before any Binary object is constructed.
 /// If initialised more than once, the `project_root` **MUST** match previous initialisations.
 pub fn initialize<T: AsRef<Path>>(project_root: T) {
     let project_root = project_root.as_ref().to_path_buf();
+    let bin_prefix = project_root.clone();
     match PROJECT_ROOT.get() {
         Some(root) => {
             assert!(
@@ -65,6 +79,38 @@ pub fn initialize<T: AsRef<Path>>(project_root: T) {
             PROJECT_ROOT.get_or_init(|| project_root);
         }
     }
+
+    let mut cfg = ADDITIONAL_CONFIG
+        .get_or_init(|| Mutex::new(AdditionalConfig::default()))
+        .lock()
+        .unwrap();
+
+    if std::env::var("ASAN_ENABLE").unwrap_or_default() == "1" {
+        // When AddressSanitized (ASAN) is enabled, the binary is put in a different target dir like
+        // this:
+        // "target/x86_64-unknown-linux-gnu/<debug|release|...>/deps/<bin>".
+        // If the binary has this form, use the second portion as an additional target path.
+        if let Ok(t) = executable_path().strip_prefix(bin_prefix) {
+            let parts: Vec<_> = t.components().map(|s| s.as_os_str()).collect();
+
+            if parts.len() == 5 && parts[0] == "target" && parts[3] == "deps" {
+                cfg.target_dir = Some(OsString::from(parts[1]));
+            }
+        }
+
+        // We also have to have `llvm-symbolizer` utility in PATH in order to decode correctly
+        // symbols in ASAN output.
+        if let Ok(path) = std::env::var("LLVM_SYMBOLIZER_DIR") {
+            let path = path.as_str().to_owned();
+            cfg.binds.push((path.clone(), path.clone()));
+            cfg.paths.push(path);
+        }
+    }
+}
+
+/// Returns path of the test's binary.
+fn executable_path() -> PathBuf {
+    PathBuf::from(std::env::args_os().next().unwrap())
 }
 
 /// Path to local binary and arguments
@@ -85,12 +131,27 @@ impl Binary {
     }
     /// Setup local binary from target for the given build type.
     pub fn from_build_type(build_type: &str, name: &str) -> Self {
+        let cfg = ADDITIONAL_CONFIG.get().unwrap().lock().unwrap();
+
         let project_root = PROJECT_ROOT.get().expect("Project root is not initialized");
         let mut path = project_root.clone();
         path.push("target");
+
+        if let Some(tgt_dir) = &cfg.target_dir {
+            path.push(tgt_dir);
+        }
+
         path.push(build_type);
         path.push(name);
-        Self::new(&path, vec![])
+
+        let mut res = Self::new(&path, vec![]);
+
+        cfg.binds.iter().for_each(|(k, v)| {
+            res.binds.insert(k.clone(), v.clone());
+        });
+
+        let paths = cfg.paths.join(":");
+        res.with_env("PATH", &paths)
     }
     /// Setup binary from path
     pub fn from_path<T: AsRef<Path>>(name: T) -> Self {
@@ -261,6 +322,7 @@ impl ContainerSpec {
         if !env.contains_key("RUST_LOG") {
             env.insert("RUST_LOG".to_string(), RUST_LOG_DEFAULT.to_string());
         }
+
         Self {
             name: name.into(),
             binary: Some(binary),
