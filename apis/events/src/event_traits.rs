@@ -1,7 +1,7 @@
 use crate::event::{
-    Component, EventDetails, EventMessage, EventMeta, EventSource, NexusChildEventDetails,
-    NvmePathEventDetails, RebuildEventDetails, RebuildStatus, ReplicaEventDetails,
-    SwitchOverEventDetails, SwitchOverStatus, Version,
+    Component, EventDetails, EventMessage, EventMeta, EventSource, HostInitiatorEventDetails,
+    NexusChildEventDetails, NvmePathEventDetails, RebuildEventDetails, RebuildStatus,
+    ReplicaEventDetails, SwitchOverEventDetails, SwitchOverStatus, Version,
 };
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
@@ -137,6 +137,32 @@ impl EventSource {
             }),
             ..self
         }
+    }
+
+    /// Add subsystem event specific data to host event source.
+    pub fn with_subsystem_data(self, subsystem_nqn: &str) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                host_initiator_details: Some(HostInitiatorEventDetails {
+                    subsystem_nqn: subsystem_nqn.to_string(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..self
+        }
+    }
+
+    /// Add host event specific data to event source.
+    pub fn with_host_initiator_data(mut self, host_nqn: &str) -> Self {
+        if let Some(mut event_details) = self.event_details {
+            if let Some(mut host_initiator_details) = event_details.host_initiator_details {
+                host_initiator_details.host_nqn = host_nqn.to_string();
+                event_details.host_initiator_details = Some(host_initiator_details);
+            }
+            self.event_details = Some(event_details);
+        }
+        self
     }
 }
 
