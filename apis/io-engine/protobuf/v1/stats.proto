@@ -1,0 +1,42 @@
+// gRPC protobuf for IOStats
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+
+package mayastor.v1;
+
+// Interface for IO stats APIs.
+service StatsRpc {
+  // RPC to get Pool IO stats.
+  rpc GetPoolIoStats (ListStatsOption) returns (PoolIoStatsResponse);
+  // RPC to reset Io Stats for all Pool, Replica and Nexus hosted on the node.
+  rpc ResetIoStats (google.protobuf.Empty) returns (google.protobuf.Empty);
+}
+
+message ListStatsOption {
+  optional string name = 1; // If specified, returns IO stats of only specified resource.
+}
+
+message PoolIoStatsResponse {
+  repeated IoStats stats = 1;
+}
+
+// Common IO stats struct for all resource types.
+message IoStats {
+  string name = 1; // Name of the device/resource.
+  uint64 num_read_ops = 2; // Number of read operations on the device.
+  uint64 bytes_read = 3; // Total bytes read on the device.
+  uint64 num_write_ops = 4; // Number of write operations on the device.
+  uint64 bytes_written = 5; // Total bytes written on the device.
+  uint64 num_unmap_ops = 6; // Number of unmap operations on the device.
+  uint64 bytes_unmapped = 7; // Total bytes unmapped on the device.
+  uint64 read_latency_ticks = 8; // Total read latency on the device in ticks.
+  uint64 write_latency_ticks = 9; // Total write latency on the device in ticks.
+  uint64 unmap_latency_ticks = 10; // Total unmap latency on the device in ticks.
+  uint64 max_read_latency_ticks = 11; // Max read latency in ticks occurred over num_read_ops.
+  uint64 min_read_latency_ticks = 12; // Min read latency in ticks occurred over num_read_ops.
+  uint64 max_write_latency_ticks = 13; // Max write latency in ticks occurred over num_write_ops.
+  uint64 min_write_latency_ticks = 14; // Min write latency in ticks occurred over num_write_ops.
+  uint64 max_unmap_latency_ticks = 15; // Max unmap latency in ticks occurred over num_unmap_ops.
+  uint64 min_unmap_latency_ticks = 16; // Min unmap latency in ticks occurred over num_unmap_ops.
+  uint64 tick_rate = 17; // Tick rate specific to node hosting the device.
+}

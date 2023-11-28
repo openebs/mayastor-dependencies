@@ -29,6 +29,7 @@ fn main() {
                 "protobuf/v1/nexus.proto",
                 "protobuf/v1/registration.proto",
                 "protobuf/v1/snapshot.proto",
+                "protobuf/v1/stats.proto",
                 "protobuf/v1/test.proto",
             ],
             &["protobuf/v1"],

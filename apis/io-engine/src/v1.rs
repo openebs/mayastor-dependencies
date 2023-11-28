@@ -105,6 +105,14 @@ pub mod nexus {
     };
 }
 
+pub mod stats {
+    pub use super::pb::{
+        stats_rpc_client::StatsRpcClient,
+        stats_rpc_server::{StatsRpc, StatsRpcServer},
+        IoStats, ListStatsOption, PoolIoStatsResponse,
+    };
+}
+
 pub mod test {
     pub use super::pb::{
         test_rpc_client::TestRpcClient,
