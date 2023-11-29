@@ -28,6 +28,7 @@ enum EventCategory {
   Node = 5;
   HighAvailability = 6;
   NvmePath = 7;
+  HostInitiator = 8;
 }
 
 // Event Action
@@ -45,6 +46,9 @@ enum EventAction {
   NvmePathFail = 10;
   NvmePathFix = 11;
   OnlineChild = 12;
+  NvmeConnect = 13;
+  NvmeDisconnect = 14;
+  NvmeKeepAliveTimeout = 15;
 }
 
 // Event meta data
@@ -95,6 +99,8 @@ message EventDetails {
   optional NexusChildEventDetails nexus_child_details = 4;
   // Nvme path event details
   optional NvmePathEventDetails nvme_path_details = 5;
+  // Host initiator event details
+  optional HostInitiatorEventDetails host_initiator_details = 6;
 }
 
 // Rebuild event details
@@ -169,4 +175,10 @@ message NexusChildEventDetails {
 message NvmePathEventDetails {
   string nqn = 1;
   string path = 2;
+}
+
+// Host initiator event details
+message HostInitiatorEventDetails {
+  string host_nqn = 1;
+  string subsystem_nqn = 2;
 }
