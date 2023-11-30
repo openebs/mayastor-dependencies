@@ -1733,15 +1733,23 @@ impl ComposeTest {
     /// Print logs for the given container.
     pub fn print_log(&self, cont: &str) {
         println!("Logs from container '{cont}':");
-        let _ = std::process::Command::new("docker")
+        if let Ok(o) = std::process::Command::new("docker")
             .args(["logs", cont])
-            .status();
+            .output()
+        {
+            println!("stdout:\n{}", String::from_utf8_lossy(&o.stdout));
+            println!("stderr:\n{}", String::from_utf8_lossy(&o.stderr));
+        }
         println!("(End of logs from container '{cont}')");
     }
 
     /// Output logs on drop if there was a panic.
     pub fn logs_on_panic(&self) -> bool {
         self.logs_on_panic
+    }
+    /// Clear the `logs_on_panic` flag.
+    pub fn clear_logs_on_panic(&mut self) {
+        self.logs_on_panic = false;
     }
     /// Cleans containers on drop.
     pub fn clean(&self) -> bool {
