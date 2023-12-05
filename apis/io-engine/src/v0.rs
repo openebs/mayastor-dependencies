@@ -36,7 +36,7 @@ include!(concat!(env!("OUT_DIR"), "/mayastor.rs"));
 // This has to be done every time Mayastor API V0 is changed.
 #[cfg(not(target_os = "linux"))]
 mod v0_generated {
-    include!("../.pregenerated/mayastor.rs");
+    include!("../../../.pregenerated/mayastor.rs");
 }
 
 #[cfg(not(target_os = "linux"))]
