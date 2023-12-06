@@ -153,6 +153,19 @@ impl EventSource {
         }
     }
 
+    /// Add target(nexus/replica) details to host event meta data.
+    pub fn with_target_data(mut self, target: &str, uuid: &str) -> Self {
+        if let Some(mut event_details) = self.event_details {
+            if let Some(mut host_initiator_details) = event_details.host_initiator_details {
+                host_initiator_details.target = target.to_string();
+                host_initiator_details.uuid = uuid.to_string();
+                event_details.host_initiator_details = Some(host_initiator_details);
+            }
+            self.event_details = Some(event_details);
+        }
+        self
+    }
+
     /// Add host event specific data to event source.
     pub fn with_host_initiator_data(mut self, host_nqn: &str) -> Self {
         if let Some(mut event_details) = self.event_details {
