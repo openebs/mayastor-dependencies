@@ -43,19 +43,28 @@ message WipeReplicaRequest {
 message WipeOptions {
   enum WipeMethod {
     // Don't actually wipe, just pretend.
-    NONE                        = 0;
+    NONE          = 0;
     // Wipe by writing zeroes.
-    WRITE_ZEROES                = 1;
+    WRITE_ZEROES  = 1;
     // Wipe by sending unmap/trim.
-    UNMAP                       = 2;
+    UNMAP         = 2;
     // Wipe by writing a given patter (see write_pattern(6) field).
-    WRITE_PATTERN               = 3;
+    WRITE_PATTERN = 3;
+    // Checksum the bdev.
+    CHECKSUM      = 4;
   }
   // Method used to wipe the bdev.
   WipeMethod        wipe_method = 1;
   // When using WRITE_PATTERN, wipe using this 32bit write pattern
   // Default: 0xDEADBEEF.
   optional uint32 write_pattern = 2;
+
+  enum CheckSumAlgorithm {
+    // The CRC32C is a variant of CRC32.
+    Crc32c = 0;
+  }
+  // When using CHECKSUM, use the following algorithm.
+  CheckSumAlgorithm   cksum_alg = 3;
 }
 
 message StreamWipeOptions {
@@ -88,6 +97,11 @@ message WipeReplicaResponse {
   uint64         remaining_bytes = 8;
   // Duration since the start of the wipe.
   google.protobuf.Duration since = 9;
+  // When using CHECKSUM, output of the algorithm.
+  oneof checksum {
+    // 32bit CRC.
+    uint32 crc32                = 10;
+  }
 }
 
 message FaultInjection {
