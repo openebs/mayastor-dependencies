@@ -117,9 +117,10 @@ pub mod test {
     pub use super::pb::{
         test_rpc_client::TestRpcClient,
         test_rpc_server::{TestRpc, TestRpcServer},
-        wipe_options, wipe_replica_request, AddFaultInjectionRequest, FaultInjection,
-        ListFaultInjectionsReply, ListFaultInjectionsRequest, RemoveFaultInjectionRequest,
-        StreamWipeOptions, WipeOptions, WipeReplicaRequest, WipeReplicaResponse,
+        wipe_options, wipe_replica_request, wipe_replica_response, AddFaultInjectionRequest,
+        FaultInjection, ListFaultInjectionsReply, ListFaultInjectionsRequest,
+        RemoveFaultInjectionRequest, StreamWipeOptions, TestFeatures, WipeOptions,
+        WipeReplicaRequest, WipeReplicaResponse,
     };
 }
 
