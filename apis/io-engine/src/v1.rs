@@ -119,8 +119,8 @@ pub mod test {
         test_rpc_server::{TestRpc, TestRpcServer},
         wipe_options, wipe_replica_request, wipe_replica_response, AddFaultInjectionRequest,
         FaultInjection, ListFaultInjectionsReply, ListFaultInjectionsRequest,
-        RemoveFaultInjectionRequest, StreamWipeOptions, WipeOptions, WipeReplicaRequest,
-        WipeReplicaResponse,
+        RemoveFaultInjectionRequest, StreamWipeOptions, TestFeatures, WipeOptions,
+        WipeReplicaRequest, WipeReplicaResponse,
     };
 }
 
