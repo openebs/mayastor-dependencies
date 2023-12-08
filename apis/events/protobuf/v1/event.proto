@@ -181,4 +181,8 @@ message NvmePathEventDetails {
 message HostInitiatorEventDetails {
   string host_nqn = 1;
   string subsystem_nqn = 2;
+  // The target on which the host is connected to the subsystem - Nexus/Replica
+  string target = 3;
+  // Target uuid
+  string uuid = 4;
 }
