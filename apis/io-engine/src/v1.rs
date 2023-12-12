@@ -55,7 +55,8 @@ pub mod replica {
         replica_rpc_client::ReplicaRpcClient,
         replica_rpc_server::{ReplicaRpc, ReplicaRpcServer},
         CreateReplicaRequest, DestroyReplicaRequest, ListReplicaOptions, ListReplicasResponse,
-        Replica, ReplicaSpaceUsage, ShareReplicaRequest, SnapshotInfo, UnshareReplicaRequest,
+        Replica, ReplicaSpaceUsage, ResizeReplicaRequest, ShareReplicaRequest, SnapshotInfo,
+        UnshareReplicaRequest,
     };
 }
 pub mod snapshot {

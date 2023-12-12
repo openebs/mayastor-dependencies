@@ -15,6 +15,7 @@ service ReplicaRpc {
   rpc ListReplicas (ListReplicaOptions) returns (ListReplicasResponse) {}
   rpc ShareReplica (ShareReplicaRequest) returns (Replica) {}
   rpc UnshareReplica (UnshareReplicaRequest) returns (Replica) {}
+  rpc ResizeReplica (ResizeReplicaRequest) returns (Replica) {}
 }
 
 // Replica space usage
@@ -76,6 +77,13 @@ message ShareReplicaRequest {
 // Unshare replica request
 message UnshareReplicaRequest {
   string uuid = 1;  // uuid of the replica
+}
+
+// Resize(expand or shrink) a replica. Only valid for normal lvol
+// replicas, and not lvols that are a snapshot.
+message ResizeReplicaRequest {
+  string uuid = 1;  // uuid of the replica.
+  uint64 requested_size = 2; // indicates the requested new size of replica.
 }
 
 // List of replicas and their properties.
