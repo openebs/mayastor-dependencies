@@ -1,7 +1,8 @@
 use crate::event::{
     Component, EventDetails, EventMessage, EventMeta, EventSource, HostInitiatorEventDetails,
     NexusChildEventDetails, NvmePathEventDetails, RebuildEventDetails, RebuildStatus,
-    ReplicaEventDetails, SwitchOverEventDetails, SwitchOverStatus, Version,
+    ReplicaEventDetails, StateChangeEventDetails, SwitchOverEventDetails, SwitchOverStatus,
+    Version,
 };
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
@@ -176,6 +177,17 @@ impl EventSource {
             self.event_details = Some(event_details);
         }
         self
+    }
+
+    /// Add state change event specific data to event source.
+    pub fn with_state_change_data(self, previous: String, next: String) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                state_change_details: Some(StateChangeEventDetails { previous, next }),
+                ..Default::default()
+            }),
+            ..self
+        }
     }
 }
 

@@ -101,6 +101,8 @@ message EventDetails {
   optional NvmePathEventDetails nvme_path_details = 5;
   // Host initiator event details
   optional HostInitiatorEventDetails host_initiator_details = 6;
+  // State change event details
+  optional StateChangeEventDetails state_change_details = 8;
 }
 
 // Rebuild event details
@@ -185,4 +187,10 @@ message HostInitiatorEventDetails {
   string target = 3;
   // Target uuid
   string uuid = 4;
+}
+
+// State change event details
+message StateChangeEventDetails {
+  string previous = 1;
+  string next = 2;
 }
