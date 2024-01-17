@@ -1,8 +1,8 @@
 use crate::event::{
     Component, EventDetails, EventMessage, EventMeta, EventSource, HostInitiatorEventDetails,
-    NexusChildEventDetails, NvmePathEventDetails, RebuildEventDetails, RebuildStatus,
-    ReplicaEventDetails, StateChangeEventDetails, SwitchOverEventDetails, SwitchOverStatus,
-    Version,
+    NexusChildEventDetails, NvmePathEventDetails, ReactorEventDetails, RebuildEventDetails,
+    RebuildStatus, ReplicaEventDetails, StateChangeEventDetails, SwitchOverEventDetails,
+    SwitchOverStatus, Version,
 };
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
@@ -177,6 +177,20 @@ impl EventSource {
             self.event_details = Some(event_details);
         }
         self
+    }
+
+    /// Add reactor event specific data to io-engine event source.
+    pub fn with_reactor_details(self, lcore: u64, state: &str) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                reactor_details: Some(ReactorEventDetails {
+                    lcore,
+                    state: state.to_string(),
+                }),
+                ..Default::default()
+            }),
+            ..self
+        }
     }
 
     /// Add state change event specific data to event source.

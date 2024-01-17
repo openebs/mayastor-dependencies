@@ -29,6 +29,7 @@ enum EventCategory {
   HighAvailability = 6;
   NvmePath = 7;
   HostInitiator = 8;
+  IoEngineCategory = 9;
 }
 
 // Event Action
@@ -49,6 +50,11 @@ enum EventAction {
   NvmeConnect = 13;
   NvmeDisconnect = 14;
   NvmeKeepAliveTimeout = 15;
+  ReactorFreeze = 16;
+  ReactorUnfreeze = 17;
+  Shutdown = 18;
+  Start = 19;
+  Stop = 20;
 }
 
 // Event meta data
@@ -103,6 +109,8 @@ message EventDetails {
   optional HostInitiatorEventDetails host_initiator_details = 6;
   // State change event details
   optional StateChangeEventDetails state_change_details = 8;
+  // Reactor event details
+  optional ReactorEventDetails reactor_details = 7;
 }
 
 // Rebuild event details
@@ -193,4 +201,12 @@ message HostInitiatorEventDetails {
 message StateChangeEventDetails {
   string previous = 1;
   string next = 2;
+}
+
+// Reactor event details
+message ReactorEventDetails {
+  // The logical core this reactor is created on
+  uint64 lcore = 1;
+  // Reactor state
+  string state = 2;
 }
