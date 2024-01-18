@@ -4,6 +4,8 @@ import "google/protobuf/wrappers.proto";
 
 import "google/protobuf/timestamp.proto";
 
+import "google/protobuf/duration.proto";
+
 package v1.event;
 
 // Event Message
@@ -107,10 +109,12 @@ message EventDetails {
   optional NvmePathEventDetails nvme_path_details = 5;
   // Host initiator event details
   optional HostInitiatorEventDetails host_initiator_details = 6;
-  // State change event details
-  optional StateChangeEventDetails state_change_details = 8;
   // Reactor event details
   optional ReactorEventDetails reactor_details = 7;
+  // State change event details
+  optional StateChangeEventDetails state_change_details = 8;
+  // Io Engine stop event details
+  optional IoEngineStopEventDetails io_engine_stop_details = 9;
 }
 
 // Rebuild event details
@@ -209,4 +213,10 @@ message ReactorEventDetails {
   uint64 lcore = 1;
   // Reactor state
   string state = 2;
+}
+
+// Io engine stop event details
+message IoEngineStopEventDetails {
+  // total time taken for the io-engine to stop
+  google.protobuf.Duration time_taken = 1;
 }

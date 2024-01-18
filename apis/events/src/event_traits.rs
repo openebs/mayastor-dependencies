@@ -1,12 +1,12 @@
 use crate::event::{
     Component, EventDetails, EventMessage, EventMeta, EventSource, HostInitiatorEventDetails,
-    NexusChildEventDetails, NvmePathEventDetails, ReactorEventDetails, RebuildEventDetails,
-    RebuildStatus, ReplicaEventDetails, StateChangeEventDetails, SwitchOverEventDetails,
-    SwitchOverStatus, Version,
+    IoEngineStopEventDetails, NexusChildEventDetails, NvmePathEventDetails, ReactorEventDetails,
+    RebuildEventDetails, RebuildStatus, ReplicaEventDetails, StateChangeEventDetails,
+    SwitchOverEventDetails, SwitchOverStatus, Version,
 };
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
 /// Once cell static variable to store the component field of the event source.
 static COMPONENT: OnceCell<Component> = OnceCell::new();
@@ -177,6 +177,19 @@ impl EventSource {
             self.event_details = Some(event_details);
         }
         self
+    }
+
+    /// Add io-engine stop event specific data to io-engine event source.
+    pub fn with_io_engine_stop_details(self, time_taken: Duration) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                io_engine_stop_details: Some(IoEngineStopEventDetails {
+                    time_taken: TryInto::try_into(time_taken).ok(),
+                }),
+                ..Default::default()
+            }),
+            ..self
+        }
     }
 
     /// Add reactor event specific data to io-engine event source.
