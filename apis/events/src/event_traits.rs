@@ -1,7 +1,7 @@
 use crate::event::{
-    Component, ErrorDetails, EventActionDuration, EventDetails, EventMessage, EventMeta,
+    CloneEventDetails, Component, ErrorDetails, EventActionDuration, EventDetails, EventMessage, EventMeta,
     EventSource, HostInitiatorEventDetails, NexusChildEventDetails, NvmePathEventDetails,
-    ReactorEventDetails, RebuildEventDetails, RebuildStatus, ReplicaEventDetails,
+    ReactorEventDetails, RebuildEventDetails, RebuildStatus, ReplicaEventDetails, SnapshotEventDetails,
     StateChangeEventDetails, SubsystemPauseDetails, SwitchOverEventDetails, SwitchOverStatus,
     Version,
 };
@@ -229,6 +229,40 @@ impl EventSource {
         EventSource {
             event_details: Some(EventDetails {
                 subsystem_pause_details: Some(SubsystemPauseDetails { nexus_pause_state }),
+                ..Default::default()
+            }),
+            ..self
+        }
+    }
+
+    /// Add snapshot event specific data to event source.
+    pub fn with_snapshot_data(
+        self,
+        parent_id: String,
+        create_time: String,
+        entity_id: String,
+    ) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                snapshot_details: Some(SnapshotEventDetails {
+                    parent_id,
+                    create_time,
+                    entity_id,
+                }),
+                ..Default::default()
+            }),
+            ..self
+        }
+    }
+
+    /// Add clone event specific data to event source.
+    pub fn with_clone_data(self, source_uuid: String, create_time: String) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                clone_details: Some(CloneEventDetails {
+                    source_uuid,
+                    create_time,
+                }),
                 ..Default::default()
             }),
             ..self

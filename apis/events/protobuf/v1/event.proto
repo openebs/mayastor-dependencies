@@ -32,6 +32,8 @@ enum EventCategory {
   NvmePath = 7;
   HostInitiator = 8;
   IoEngineCategory = 9;
+  Snapshot = 10;
+  Clone = 11;
 }
 
 // Event Action
@@ -119,6 +121,10 @@ message EventDetails {
   optional StateChangeEventDetails state_change_details = 8;
   // Event action duration details
   optional EventActionDuration action_duration_details = 9;
+  // Snapshot event details
+  optional SnapshotEventDetails snapshot_details = 10;
+  // Clone event details
+  optional CloneEventDetails clone_details = 11;
   // Error details
   optional ErrorDetails error_details = 12;
   // Subsystem pause details
@@ -238,4 +244,22 @@ message ErrorDetails {
 message SubsystemPauseDetails {
   // Nexus pause state
   string nexus_pause_state = 1;
+}
+
+// Snapshot event details
+message SnapshotEventDetails {
+  // Parent id of the snapshot
+  string parent_id = 1;
+  // Snapshot creation time
+  string create_time = 2;
+  // Entity id of the snapshot
+  string entity_id = 3;
+}
+
+// Clone event details
+message CloneEventDetails {
+  // Source uuid from which clone is created
+  string source_uuid = 1;
+  // Clone creation time
+  string create_time = 2;
 }
