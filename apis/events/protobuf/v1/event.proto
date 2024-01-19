@@ -115,6 +115,8 @@ message EventDetails {
   optional StateChangeEventDetails state_change_details = 8;
   // Io Engine stop event details
   optional IoEngineStopEventDetails io_engine_stop_details = 9;
+  // Error details
+  optional ErrorDetails error_details = 12;
 }
 
 // Rebuild event details
@@ -219,4 +221,9 @@ message ReactorEventDetails {
 message IoEngineStopEventDetails {
   // total time taken for the io-engine to stop
   google.protobuf.Duration time_taken = 1;
+}
+
+// Error details
+message ErrorDetails {
+  string error = 1;
 }

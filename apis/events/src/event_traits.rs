@@ -1,8 +1,9 @@
 use crate::event::{
-    Component, EventDetails, EventMessage, EventMeta, EventSource, HostInitiatorEventDetails,
-    IoEngineStopEventDetails, NexusChildEventDetails, NvmePathEventDetails, ReactorEventDetails,
-    RebuildEventDetails, RebuildStatus, ReplicaEventDetails, StateChangeEventDetails,
-    SwitchOverEventDetails, SwitchOverStatus, Version,
+    Component, ErrorDetails, EventDetails, EventMessage, EventMeta, EventSource,
+    HostInitiatorEventDetails, IoEngineStopEventDetails, NexusChildEventDetails,
+    NvmePathEventDetails, ReactorEventDetails, RebuildEventDetails, RebuildStatus,
+    ReplicaEventDetails, StateChangeEventDetails, SwitchOverEventDetails, SwitchOverStatus,
+    Version,
 };
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
@@ -212,6 +213,17 @@ impl EventSource {
             event_details: Some(EventDetails {
                 state_change_details: Some(StateChangeEventDetails { previous, next }),
                 ..Default::default()
+            }),
+            ..self
+        }
+    }
+
+    /// Add error details to event source.
+    pub fn with_error_details(self, error: String) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                error_details: Some(ErrorDetails { error }),
+                ..self.event_details.unwrap_or_default()
             }),
             ..self
         }
