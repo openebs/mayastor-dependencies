@@ -109,7 +109,7 @@ pub mod stats {
     pub use super::pb::{
         stats_rpc_client::StatsRpcClient,
         stats_rpc_server::{StatsRpc, StatsRpcServer},
-        IoStats, ListStatsOption, PoolIoStatsResponse, NexusIoStatsResponse,
+        IoStats, ListStatsOption, NexusIoStatsResponse, PoolIoStatsResponse,
     };
 }
 
