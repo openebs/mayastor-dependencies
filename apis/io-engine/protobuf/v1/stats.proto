@@ -8,15 +8,24 @@ package mayastor.v1;
 service StatsRpc {
   // RPC to get Pool IO stats.
   rpc GetPoolIoStats (ListStatsOption) returns (PoolIoStatsResponse);
+  // RPC to get Nexus IO stats.
+  rpc GetNexusIoStats (ListStatsOption) returns (NexusIoStatsResponse);
   // RPC to reset Io Stats for all Pool, Replica and Nexus hosted on the node.
   rpc ResetIoStats (google.protobuf.Empty) returns (google.protobuf.Empty);
 }
 
+// RPC option to list IO stats of a specific resource.
 message ListStatsOption {
   optional string name = 1; // If specified, returns IO stats of only specified resource.
 }
 
+// Response for Pool IO stats RPC.
 message PoolIoStatsResponse {
+  repeated IoStats stats = 1;
+}
+
+// Response for Nexus IO stats RPC.
+message NexusIoStatsResponse {
   repeated IoStats stats = 1;
 }
 
