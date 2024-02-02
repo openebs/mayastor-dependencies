@@ -249,11 +249,11 @@ message SubsystemPauseDetails {
 // Snapshot event details
 message SnapshotEventDetails {
   // Parent id of the snapshot
-  string parent_id = 1;
+  string replica_id = 1;
   // Snapshot creation time
   string create_time = 2;
   // Entity id of the snapshot
-  string entity_id = 3;
+  string volume_id = 3;
 }
 
 // Clone event details

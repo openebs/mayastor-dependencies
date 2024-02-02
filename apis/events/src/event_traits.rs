@@ -1,9 +1,9 @@
 use crate::event::{
-    CloneEventDetails, Component, ErrorDetails, EventActionDuration, EventDetails, EventMessage, EventMeta,
-    EventSource, HostInitiatorEventDetails, NexusChildEventDetails, NvmePathEventDetails,
-    ReactorEventDetails, RebuildEventDetails, RebuildStatus, ReplicaEventDetails, SnapshotEventDetails,
-    StateChangeEventDetails, SubsystemPauseDetails, SwitchOverEventDetails, SwitchOverStatus,
-    Version,
+    CloneEventDetails, Component, ErrorDetails, EventActionDuration, EventDetails, EventMessage,
+    EventMeta, EventSource, HostInitiatorEventDetails, NexusChildEventDetails,
+    NvmePathEventDetails, ReactorEventDetails, RebuildEventDetails, RebuildStatus,
+    ReplicaEventDetails, SnapshotEventDetails, StateChangeEventDetails, SubsystemPauseDetails,
+    SwitchOverEventDetails, SwitchOverStatus, Version,
 };
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
@@ -238,16 +238,16 @@ impl EventSource {
     /// Add snapshot event specific data to event source.
     pub fn with_snapshot_data(
         self,
-        parent_id: String,
+        replica_id: String,
         create_time: String,
-        entity_id: String,
+        volume_id: String,
     ) -> Self {
         EventSource {
             event_details: Some(EventDetails {
                 snapshot_details: Some(SnapshotEventDetails {
-                    parent_id,
+                    replica_id,
                     create_time,
-                    entity_id,
+                    volume_id,
                 }),
                 ..Default::default()
             }),
