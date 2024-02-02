@@ -57,6 +57,10 @@ enum EventAction {
   Shutdown = 18;
   Start = 19;
   Stop = 20;
+  SubsystemPause = 21;
+  SubsystemResume = 22;
+  Init = 23;
+  Reconfiguring = 24;
 }
 
 // Event meta data
@@ -113,10 +117,12 @@ message EventDetails {
   optional ReactorEventDetails reactor_details = 7;
   // State change event details
   optional StateChangeEventDetails state_change_details = 8;
-  // Io Engine stop event details
-  optional IoEngineStopEventDetails io_engine_stop_details = 9;
+  // Event action duration details
+  optional EventActionDuration action_duration_details = 9;
   // Error details
   optional ErrorDetails error_details = 12;
+  // Subsystem pause details
+  optional SubsystemPauseDetails subsystem_pause_details = 13;
 }
 
 // Rebuild event details
@@ -217,13 +223,19 @@ message ReactorEventDetails {
   string state = 2;
 }
 
-// Io engine stop event details
-message IoEngineStopEventDetails {
-  // total time taken for the io-engine to stop
+// Event action duration details
+message EventActionDuration {
+  // Total time taken for the action to complete
   google.protobuf.Duration time_taken = 1;
 }
 
 // Error details
 message ErrorDetails {
   string error = 1;
+}
+
+// Subsystem pause details
+message SubsystemPauseDetails {
+  // Nexus pause state
+  string nexus_pause_state = 1;
 }

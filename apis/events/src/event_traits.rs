@@ -1,8 +1,8 @@
 use crate::event::{
-    Component, ErrorDetails, EventDetails, EventMessage, EventMeta, EventSource,
-    HostInitiatorEventDetails, IoEngineStopEventDetails, NexusChildEventDetails,
-    NvmePathEventDetails, ReactorEventDetails, RebuildEventDetails, RebuildStatus,
-    ReplicaEventDetails, StateChangeEventDetails, SwitchOverEventDetails, SwitchOverStatus,
+    Component, ErrorDetails, EventActionDuration, EventDetails, EventMessage, EventMeta,
+    EventSource, HostInitiatorEventDetails, NexusChildEventDetails, NvmePathEventDetails,
+    ReactorEventDetails, RebuildEventDetails, RebuildStatus, ReplicaEventDetails,
+    StateChangeEventDetails, SubsystemPauseDetails, SwitchOverEventDetails, SwitchOverStatus,
     Version,
 };
 use chrono::{DateTime, Utc};
@@ -180,14 +180,14 @@ impl EventSource {
         self
     }
 
-    /// Add io-engine stop event specific data to io-engine event source.
-    pub fn with_io_engine_stop_details(self, time_taken: Duration) -> Self {
+    /// Add event action(IoEngine Stop, Nexus SubsystemPause etc.) duration details to event source.
+    pub fn with_event_action_duration_details(self, time_taken: Duration) -> Self {
         EventSource {
             event_details: Some(EventDetails {
-                io_engine_stop_details: Some(IoEngineStopEventDetails {
+                action_duration_details: Some(EventActionDuration {
                     time_taken: TryInto::try_into(time_taken).ok(),
                 }),
-                ..Default::default()
+                ..self.event_details.unwrap_or_default()
             }),
             ..self
         }
@@ -224,6 +224,17 @@ impl EventSource {
             event_details: Some(EventDetails {
                 error_details: Some(ErrorDetails { error }),
                 ..self.event_details.unwrap_or_default()
+            }),
+            ..self
+        }
+    }
+
+    /// Add subsystem pause details to event source.
+    pub fn with_subsystem_pause_details(self, nexus_pause_state: String) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                subsystem_pause_details: Some(SubsystemPauseDetails { nexus_pause_state }),
+                ..Default::default()
             }),
             ..self
         }
