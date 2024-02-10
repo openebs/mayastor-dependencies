@@ -21,6 +21,7 @@ service PoolRpc {
 // Specifies the type of the pool
 enum PoolType {
   Lvs = 0;  // pool backed by spdk lvs
+  Lvm = 1;  // pool backed by lvm vg
 }
 
 // The wrapper for pooltype.
