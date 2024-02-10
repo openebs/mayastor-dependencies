@@ -37,7 +37,7 @@ pub mod pool {
         pool_rpc_client::PoolRpcClient,
         pool_rpc_server::{PoolRpc, PoolRpcServer},
         CreatePoolRequest, DestroyPoolRequest, ExportPoolRequest, ImportPoolRequest,
-        ListPoolOptions, ListPoolsResponse, Pool, PoolState, PoolType,
+        ListPoolOptions, ListPoolsResponse, Pool, PoolState, PoolType, PoolTypeValue,
     };
 }
 
