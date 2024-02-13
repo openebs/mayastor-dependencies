@@ -98,12 +98,7 @@ impl EventSource {
             event_details: Some(EventDetails {
                 switch_over_details: Some(SwitchOverEventDetails {
                     switch_over_status: status as i32,
-                    start_time: {
-                        match start_time.try_into() {
-                            Ok(time) => Some(time),
-                            Err(_) => None,
-                        }
-                    },
+                    start_time: Some(start_time.into()),
                     existing_nqn: existing_nqn.to_string(),
                     new_path,
                     retry_count,
