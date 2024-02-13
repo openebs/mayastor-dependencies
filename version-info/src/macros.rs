@@ -48,12 +48,17 @@ macro_rules! version_info_string {
 }
 
 /// Gets package's version info as a static str.
-/// Each call to this macro leaks a string.
 #[macro_export]
 macro_rules! version_info_str {
-    () => {
-        Box::leak(Box::new(String::from($crate::version_info!()))) as &'static str
-    };
+    () => {{
+        static mut BUF: Vec<u8> = Vec::new();
+        let s = String::from($crate::version_info!());
+        unsafe {
+            BUF.resize(s.len(), 0);
+            BUF.clone_from_slice(s.as_bytes());
+        }
+        unsafe { std::str::from_utf8_unchecked(BUF.as_slice()) }
+    }};
 }
 
 /// Formats package related information.
