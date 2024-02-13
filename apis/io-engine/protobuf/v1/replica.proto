@@ -16,6 +16,13 @@ service ReplicaRpc {
   rpc ShareReplica (ShareReplicaRequest) returns (Replica) {}
   rpc UnshareReplica (UnshareReplicaRequest) returns (Replica) {}
   rpc ResizeReplica (ResizeReplicaRequest) returns (Replica) {}
+  rpc SetReplicaEntityId (SetReplicaEntityIdRequest) returns (Replica) {}
+}
+
+// Request struct to set the entity_id of the replica, If not already set.
+message SetReplicaEntityIdRequest {
+  string uuid = 1;  // Uuid of the replica.
+  string entity_id = 2; // Entity which owns the replica.
 }
 
 // Replica space usage
@@ -45,6 +52,7 @@ message Replica {
   bool is_snapshot = 11; // true: snapshot false: normal replica
   bool is_clone = 12; // true: clone replica from snapshot, false: normal replica
   optional string snapshot_uuid = 13; // snapshot uuid from which the clone replica is created
+  optional string entity_id = 14; // entity which owns the replica, if any
 }
 
 message CreateReplicaRequest {
@@ -55,6 +63,7 @@ message CreateReplicaRequest {
   bool thin = 5;    // thin provisioning
   ShareProtocol share = 6;  // protocol to expose the replica over
   repeated string allowed_hosts = 7; // host (nqn's) which are allowed to connect to the target.
+  optional string entity_id = 8; // entity which owns the replica, if any
 }
 
 // Destroy replica arguments.
