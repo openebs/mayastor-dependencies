@@ -4,6 +4,8 @@ import "google/protobuf/wrappers.proto";
 
 import "google/protobuf/timestamp.proto";
 
+import "google/protobuf/duration.proto";
+
 package v1.event;
 
 // Event Message
@@ -55,6 +57,10 @@ enum EventAction {
   Shutdown = 18;
   Start = 19;
   Stop = 20;
+  SubsystemPause = 21;
+  SubsystemResume = 22;
+  Init = 23;
+  Reconfiguring = 24;
 }
 
 // Event meta data
@@ -107,10 +113,16 @@ message EventDetails {
   optional NvmePathEventDetails nvme_path_details = 5;
   // Host initiator event details
   optional HostInitiatorEventDetails host_initiator_details = 6;
-  // State change event details
-  optional StateChangeEventDetails state_change_details = 8;
   // Reactor event details
   optional ReactorEventDetails reactor_details = 7;
+  // State change event details
+  optional StateChangeEventDetails state_change_details = 8;
+  // Event action duration details
+  optional EventActionDuration action_duration_details = 9;
+  // Error details
+  optional ErrorDetails error_details = 12;
+  // Subsystem pause details
+  optional SubsystemPauseDetails subsystem_pause_details = 13;
 }
 
 // Rebuild event details
@@ -209,4 +221,21 @@ message ReactorEventDetails {
   uint64 lcore = 1;
   // Reactor state
   string state = 2;
+}
+
+// Event action duration details
+message EventActionDuration {
+  // Total time taken for the action to complete
+  google.protobuf.Duration time_taken = 1;
+}
+
+// Error details
+message ErrorDetails {
+  string error = 1;
+}
+
+// Subsystem pause details
+message SubsystemPauseDetails {
+  // Nexus pause state
+  string nexus_pause_state = 1;
 }

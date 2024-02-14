@@ -1,4 +1,4 @@
-{ profile ? "nightly", date ? "2023-08-10" }:
+{ profile ? "nightly", date ? "2024-02-06" }:
 let
   sources = import ./nix/sources.nix;
   pkgs = import sources.nixpkgs {

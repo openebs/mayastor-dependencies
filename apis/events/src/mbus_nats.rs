@@ -315,10 +315,7 @@ impl<T: Serialize + DeserializeOwned> BusSubscription<T> {
     /// Access to the next message for the consumer.
     pub async fn next(&mut self) -> Option<T> {
         loop {
-            let Some(message) = self.messages.next().await else {
-                return None;
-            };
-            let message = match message {
+            let message = match self.messages.next().await? {
                 Ok(message) => message,
                 Err(error) => {
                     match error.kind() {

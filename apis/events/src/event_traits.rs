@@ -1,12 +1,13 @@
 use crate::event::{
-    Component, EventDetails, EventMessage, EventMeta, EventSource, HostInitiatorEventDetails,
-    NexusChildEventDetails, NvmePathEventDetails, ReactorEventDetails, RebuildEventDetails,
-    RebuildStatus, ReplicaEventDetails, StateChangeEventDetails, SwitchOverEventDetails,
-    SwitchOverStatus, Version,
+    Component, ErrorDetails, EventActionDuration, EventDetails, EventMessage, EventMeta,
+    EventSource, HostInitiatorEventDetails, NexusChildEventDetails, NvmePathEventDetails,
+    ReactorEventDetails, RebuildEventDetails, RebuildStatus, ReplicaEventDetails,
+    StateChangeEventDetails, SubsystemPauseDetails, SwitchOverEventDetails, SwitchOverStatus,
+    Version,
 };
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
 /// Once cell static variable to store the component field of the event source.
 static COMPONENT: OnceCell<Component> = OnceCell::new();
@@ -97,12 +98,7 @@ impl EventSource {
             event_details: Some(EventDetails {
                 switch_over_details: Some(SwitchOverEventDetails {
                     switch_over_status: status as i32,
-                    start_time: {
-                        match start_time.try_into() {
-                            Ok(time) => Some(time),
-                            Err(_) => None,
-                        }
-                    },
+                    start_time: Some(start_time.into()),
                     existing_nqn: existing_nqn.to_string(),
                     new_path,
                     retry_count,
@@ -179,6 +175,19 @@ impl EventSource {
         self
     }
 
+    /// Add event action(IoEngine Stop, Nexus SubsystemPause etc.) duration details to event source.
+    pub fn with_event_action_duration_details(self, time_taken: Duration) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                action_duration_details: Some(EventActionDuration {
+                    time_taken: TryInto::try_into(time_taken).ok(),
+                }),
+                ..self.event_details.unwrap_or_default()
+            }),
+            ..self
+        }
+    }
+
     /// Add reactor event specific data to io-engine event source.
     pub fn with_reactor_details(self, lcore: u64, state: &str) -> Self {
         EventSource {
@@ -198,6 +207,28 @@ impl EventSource {
         EventSource {
             event_details: Some(EventDetails {
                 state_change_details: Some(StateChangeEventDetails { previous, next }),
+                ..Default::default()
+            }),
+            ..self
+        }
+    }
+
+    /// Add error details to event source.
+    pub fn with_error_details(self, error: String) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                error_details: Some(ErrorDetails { error }),
+                ..self.event_details.unwrap_or_default()
+            }),
+            ..self
+        }
+    }
+
+    /// Add subsystem pause details to event source.
+    pub fn with_subsystem_pause_details(self, nexus_pause_state: String) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                subsystem_pause_details: Some(SubsystemPauseDetails { nexus_pause_state }),
                 ..Default::default()
             }),
             ..self
