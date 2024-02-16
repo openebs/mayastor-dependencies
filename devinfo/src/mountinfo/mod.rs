@@ -1,4 +1,11 @@
-use crate::partition::PartitionID;
+use crate::{
+    mountinfo::{
+        bytebuf::ByteBuf,
+        error::{MountInfoError, Result},
+    },
+    partition::PartitionID,
+};
+use io_utils::consistent_read;
 use std::{
     ffi::OsString,
     fmt::{self, Display, Formatter},
@@ -7,7 +14,14 @@ use std::{
     os::unix::prelude::OsStringExt,
     path::{Path, PathBuf},
     str::FromStr,
+    sync::OnceLock,
 };
+
+mod bytebuf;
+mod error;
+/// Contains tools to interact with files, etc.
+mod io_utils;
+
 #[derive(Debug, Default, Clone, Hash, Eq, PartialEq)]
 pub struct MountInfo {
     pub source: PathBuf,
@@ -137,6 +151,14 @@ pub struct MountIter<R> {
     buffer: String,
 }
 
+impl<R: io::Read> MountIter<BufReader<R>> {
+    /// Read mounts from any file/buffer, or anything which implements
+    /// std::io::Read or event Box<dyn std::io::Read>.
+    pub fn new_from_readable(readable: R) -> Self {
+        Self::new_from_reader(BufReader::new(readable))
+    }
+}
+
 impl MountIter<BufReader<File>> {
     pub fn new() -> io::Result<Self> {
         Self::new_from_file("/proc/mounts")
@@ -144,7 +166,7 @@ impl MountIter<BufReader<File>> {
 
     /// Read mounts from any mount-tab-like file.
     pub fn new_from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-        Ok(Self::new_from_reader(BufReader::new(File::open(path)?)))
+        Ok(Self::new_from_readable(File::open(path)?))
     }
 }
 
@@ -201,5 +223,73 @@ impl<R: BufRead> Iterator for MountIter<R> {
                 Err(why) => return Some(Err(why)),
             }
         }
+    }
+}
+
+pub static SAFE_MOUNT_ITER: OnceLock<SafeMountIter> = OnceLock::new();
+
+/// This returns a Result<Iterator> with reads /proc/mounts consistently.
+pub struct SafeMountIter {
+    /// This is the flag for the /proc/mounts linux bug. The bug has been fixed in
+    /// commit 9f6c61f96f2d97 (v5.8+). This borrows the consistent read solution from
+    /// k8s.io/mount-utils. Assumes bug exists by default, if version check fails.
+    kernel_has_mount_info_bug: bool,
+    mounts_filepath: PathBuf,
+}
+
+impl SafeMountIter {
+    /// Initialize (if not done already) and get a Result<MountIter>. Retry default no. of times.
+    pub fn get() -> Result<MountIter<BufReader<Box<dyn io::Read>>>> {
+        Self::get_with_retries(None)
+    }
+
+    /// Initialize (if not done already) and get a Result<MountIter>.
+    /// More retries make sense if the mount file is likely to see a lot of unmounts often.
+    pub fn get_with_retries(
+        retries: Option<u32>,
+    ) -> Result<MountIter<BufReader<Box<dyn io::Read>>>> {
+        // Init.
+        let safe_mount_iter = SAFE_MOUNT_ITER.get_or_init(|| {
+            use nix::sys::utsname::uname;
+            use semver::Version;
+
+            // Bug was fixed in v5.8 with the commit 9f6c61f96f2d97.
+            const FIXED_VERSION: Version = Version::new(5, 8, 0);
+
+            let check_uname = || -> Result<bool> {
+                let uname = uname()?;
+
+                let release =
+                    uname
+                        .release()
+                        .to_str()
+                        .ok_or(MountInfoError::ConvertOsStrToStr {
+                            source: uname.release().to_os_string(),
+                        })?;
+                let version = Version::parse(release)?;
+
+                Ok(version.lt(&FIXED_VERSION))
+            };
+
+            // Assume bug exists by default.
+            let kernel_has_mount_info_bug = check_uname().unwrap_or(true);
+
+            Self {
+                kernel_has_mount_info_bug,
+                mounts_filepath: PathBuf::from("/proc/mounts"),
+            }
+        });
+
+        // Decide if consistent read is required.
+        if safe_mount_iter.kernel_has_mount_info_bug {
+            let buf: ByteBuf =
+                consistent_read(safe_mount_iter.mounts_filepath.as_path(), retries)?.into();
+            let buf: Box<dyn io::Read> = Box::new(buf);
+            return Ok(MountIter::new_from_readable(buf));
+        }
+
+        let file = File::open(safe_mount_iter.mounts_filepath.as_path())?;
+        let file: Box<dyn io::Read> = Box::new(file);
+        Ok(MountIter::new_from_readable(file))
     }
 }

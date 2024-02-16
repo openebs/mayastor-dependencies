@@ -5,6 +5,8 @@ authors = ["Jeffry Molanus <jeffry.molanus@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+nix = { version = "0.27.1", default-features = false, features = [ "feature" ] }
+semver = "1.0.20"
 snafu = "0.7.5"
 url = "2.4.1"
 uuid = { version = "1.4.1", features = ["v4"] }
