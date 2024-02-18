@@ -17,8 +17,11 @@ use std::{
     sync::OnceLock,
 };
 
+/// Contains a type which is Sized and implements io::Read.
+/// Useful as a Read-able alternative to a Vec<u8>.
 mod bytebuf;
-mod error;
+/// Errors for MountInfo affairs.
+pub mod error;
 /// Contains tools to interact with files, etc.
 mod io_utils;
 
@@ -226,7 +229,7 @@ impl<R: BufRead> Iterator for MountIter<R> {
     }
 }
 
-pub static SAFE_MOUNT_ITER: OnceLock<SafeMountIter> = OnceLock::new();
+static SAFE_MOUNT_ITER: OnceLock<SafeMountIter> = OnceLock::new();
 
 /// This returns a Result<Iterator> with reads /proc/mounts consistently.
 pub struct SafeMountIter {

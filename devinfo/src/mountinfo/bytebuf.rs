@@ -1,7 +1,7 @@
 use std::io::{IoSliceMut, Read};
 
-/// This is io::Read capable Sized type. This can wrap around a Vec<u8>.
-pub struct ByteBuf {
+/// This is io::Read capable Sized type. This wraps around a Vec<u8>.
+pub(crate) struct ByteBuf {
     inner: Vec<u8>,
 }
 
