@@ -1,7 +1,7 @@
 use crate::mountinfo::error::{MountInfoError, Result};
 use std::{fs::read, path::Path};
 
-const DEFAULT_RETRY_COUNT: u32 = 2;
+const DEFAULT_RETRY_COUNT: u32 = 10;
 
 /// Issue std::fs::read on a file twice and compare the two byte sequences
 /// to see if the reads were consistent. Retry if the reads resulted in different byte
