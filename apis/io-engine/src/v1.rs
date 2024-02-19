@@ -91,10 +91,10 @@ pub mod nexus {
         PublishNexusRequest, PublishNexusResponse, RebuildHistoryRecord, RebuildHistoryRequest,
         RebuildHistoryResponse, RebuildJobState, RebuildStateRequest, RebuildStateResponse,
         RebuildStatsRequest, RebuildStatsResponse, RemoveChildNexusRequest,
-        RemoveChildNexusResponse, ResumeRebuildRequest, ResumeRebuildResponse,
-        SetNvmeAnaStateRequest, SetNvmeAnaStateResponse, ShareProtocol, ShutdownNexusRequest,
-        ShutdownNexusResponse, StartRebuildRequest, StartRebuildResponse, StopRebuildRequest,
-        StopRebuildResponse, UnpublishNexusRequest, UnpublishNexusResponse,
+        RemoveChildNexusResponse, ResizeNexusRequest, ResizeNexusResponse, ResumeRebuildRequest,
+        ResumeRebuildResponse, SetNvmeAnaStateRequest, SetNvmeAnaStateResponse, ShareProtocol,
+        ShutdownNexusRequest, ShutdownNexusResponse, StartRebuildRequest, StartRebuildResponse,
+        StopRebuildRequest, StopRebuildResponse, UnpublishNexusRequest, UnpublishNexusResponse,
     };
 }
 

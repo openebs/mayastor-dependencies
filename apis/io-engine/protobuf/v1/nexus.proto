@@ -16,6 +16,7 @@ service NexusRpc {
 
   rpc CreateNexus (CreateNexusRequest) returns (CreateNexusResponse) {}
   rpc DestroyNexus (DestroyNexusRequest) returns (google.protobuf.Empty) {}
+  rpc ResizeNexus (ResizeNexusRequest) returns (ResizeNexusResponse) {}
   rpc ListNexus (ListNexusOptions) returns (ListNexusResponse) {}
   rpc AddChildNexus (AddChildNexusRequest) returns (AddChildNexusResponse) {}
   rpc RemoveChildNexus (RemoveChildNexusRequest) returns (RemoveChildNexusResponse) {}
@@ -174,8 +175,17 @@ message ListNexusResponse {
   repeated Nexus nexus_list = 1;
 }
 
+message ResizeNexusResponse {
+  Nexus nexus = 1;
+}
+
 message DestroyNexusRequest   {
   string uuid = 1;    // uuid of the nexus
+}
+
+message ResizeNexusRequest {
+  string uuid = 1;  // uuid of the nexus
+  uint64 requested_size = 2; // new requested size of the nexus bdev
 }
 
 message ShutdownNexusRequest   {
