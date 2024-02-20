@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+package mayastor.v1;
+
+service SnapshotRebuildRpc {
+  rpc CreateSnapshotRebuild(CreateSnapshotRebuildRequest) returns (SnapshotRebuild) {}
+  rpc ListSnapshotRebuild(ListSnapshotRebuildRequest) returns (ListSnapshotRebuildResponse) {}
+  rpc DestroySnapshotRebuild(DestroySnapshotRebuildRequest) returns (google.protobuf.Empty) {}
+}
+
+message CreateSnapshotRebuildRequest {
+  // The uuid of the rebuilding replica.
+  string                     replica_uuid = 1;
+  // The nvmf URI of the source Snapshot from which we:
+  // 1. read allocated data bitmap
+  // 2. read data proper
+  string                       source_uri = 2;
+  // In case of crash/restart, we can first
+  // 1. read allocated data bitmap
+  // and then depending on the resume flag:
+  // true:
+  // 2. read data starting from the last known checkpoint
+  // false:
+  // 2. start again from scratch
+  bool                             resume = 3;
+  // A bitmap where set bits indicate which
+  // segment of the snapshot are allocated and therefore
+  // need to be transferred for the rebuild.
+  // If not specified the replica shall retrieve it
+  // using nvme-admin command.
+  optional SnapshotRebuildBitmap   bitmap = 4;
+
+  message RebuildPolicy {
+    // Grace period allowing the rebuild to fix itself, before
+    // transitioning to an error state.
+    google.protobuf.Duration error_period = 1;
+    // Grace period allowing an errored rebuild to fix itself, before
+    // transitioning to a final error state.
+    google.protobuf.Duration  fail_period = 2;
+  }
+  // A set of configuration options allowing the data-plane to
+  // reconnect should it encounter any connection errors
+  optional RebuildPolicy     error_policy = 5;
+}
+
+message SnapshotRebuild {
+  enum RebuildStatus {
+    Unknown    = 0;
+    Created    = 1;
+    Running    = 2;
+    Paused     = 3;
+    Successful = 4;
+    Failed     = 5;
+  }
+  // The uuid of the rebuilding replica.
+  string                                uuid = 1;
+  // The nvmf URI of the source Snapshot from which we:
+  // 1. read allocated data bitmap
+  // 2. read data proper
+  string                          source_uri = 2;
+  // Current status of the rebuild.
+  RebuildStatus                       status = 3;
+  // Total bytes to rebuild.
+  uint64                               total = 4;
+  // Total bytes rebuilt so far.
+  uint64                             rebuilt = 5;
+  // Remaining bytes to rebuild.
+  uint64                           remaining = 6;
+  // Cluster index of the last persistence checkpoint.
+  // All previous clusters have been rebuilt and this
+  // is persisted in the replica metadata.
+  uint64                persisted_checkpoint = 7;
+  // Timestamp taken at the start of the rebuild
+  google.protobuf.Timestamp  start_timestamp = 8;
+  // Timestamp taken at the end of the rebuild
+  google.protobuf.Timestamp    end_timestamp = 9;
+}
+
+message SnapshotRebuildBitmap {
+  // Each bit corresponds to a specific size, ex: 4MiB
+  uint64          bit_size = 1;
+  // An array of 64 bit uints, where each bit index corresponds to
+  // a specific `bit_size` offset.
+  repeated uint64  bit_map = 2;
+}
+
+message ListSnapshotRebuildRequest {
+  // List all rebuilds or just the rebuild pertaining to the given replica uuid.
+  optional string replica_uuid = 1;
+}
+message ListSnapshotRebuildResponse {
+  repeated SnapshotRebuild rebuilds = 1;
+}
+
+message DestroySnapshotRebuildRequest {
+  string replica_uuid = 1;
+}
+
