@@ -65,3 +65,18 @@ impl From<semver::Error> for MountInfoError {
         Self::Semver(semver_err)
     }
 }
+
+impl From<MountInfoError> for std::io::Error {
+    fn from(error: MountInfoError) -> Self {
+        use std::io::{Error, ErrorKind};
+
+        match error {
+            MountInfoError::Io(std_io_err) => std_io_err,
+            // TODO: Use ErrorKind::ResourceBusy when it is stable.
+            MountInfoError::InconsistentRead { .. } => Error::new(ErrorKind::InvalidData, error),
+            MountInfoError::Nix(errno) => Error::from(errno),
+            MountInfoError::ConvertOsStrToStr { .. } => Error::new(ErrorKind::InvalidData, error),
+            MountInfoError::Semver(err) => Error::new(ErrorKind::InvalidInput, err),
+        }
+    }
+}
