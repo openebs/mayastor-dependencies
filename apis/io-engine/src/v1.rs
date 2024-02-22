@@ -117,6 +117,14 @@ pub mod test {
     };
 }
 
+pub mod snapshot_rebuild {
+    pub use super::pb::{
+        snapshot_rebuild_rpc_server::{SnapshotRebuildRpc, SnapshotRebuildRpcServer},
+        CreateSnapshotRebuildRequest, DestroySnapshotRebuildRequest, ListSnapshotRebuildRequest,
+        ListSnapshotRebuildResponse, SnapshotRebuild,
+    };
+}
+
 #[derive(Debug)]
 pub enum Error {
     ParseError,
