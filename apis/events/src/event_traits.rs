@@ -1,9 +1,9 @@
 use crate::event::{
-    Component, ErrorDetails, EventActionDuration, EventDetails, EventMessage, EventMeta,
-    EventSource, HostInitiatorEventDetails, NexusChildEventDetails, NvmePathEventDetails,
-    ReactorEventDetails, RebuildEventDetails, RebuildStatus, ReplicaEventDetails,
-    StateChangeEventDetails, SubsystemPauseDetails, SwitchOverEventDetails, SwitchOverStatus,
-    Version,
+    CloneEventDetails, Component, ErrorDetails, EventActionDuration, EventDetails, EventMessage,
+    EventMeta, EventSource, HostInitiatorEventDetails, NexusChildEventDetails,
+    NvmePathEventDetails, ReactorEventDetails, RebuildEventDetails, RebuildStatus,
+    ReplicaEventDetails, SnapshotEventDetails, StateChangeEventDetails, SubsystemPauseDetails,
+    SwitchOverEventDetails, SwitchOverStatus, Version,
 };
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
@@ -229,6 +229,40 @@ impl EventSource {
         EventSource {
             event_details: Some(EventDetails {
                 subsystem_pause_details: Some(SubsystemPauseDetails { nexus_pause_state }),
+                ..Default::default()
+            }),
+            ..self
+        }
+    }
+
+    /// Add snapshot event specific data to event source.
+    pub fn with_snapshot_data(
+        self,
+        replica_id: String,
+        create_time: String,
+        volume_id: String,
+    ) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                snapshot_details: Some(SnapshotEventDetails {
+                    replica_id,
+                    create_time,
+                    volume_id,
+                }),
+                ..Default::default()
+            }),
+            ..self
+        }
+    }
+
+    /// Add clone event specific data to event source.
+    pub fn with_clone_data(self, source_uuid: String, create_time: String) -> Self {
+        EventSource {
+            event_details: Some(EventDetails {
+                clone_details: Some(CloneEventDetails {
+                    source_uuid,
+                    create_time,
+                }),
                 ..Default::default()
             }),
             ..self
