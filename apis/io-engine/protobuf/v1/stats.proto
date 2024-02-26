@@ -10,6 +10,8 @@ service StatsRpc {
   rpc GetPoolIoStats (ListStatsOption) returns (PoolIoStatsResponse);
   // RPC to get Nexus IO stats.
   rpc GetNexusIoStats (ListStatsOption) returns (NexusIoStatsResponse);
+  // RPC to get Replica IO stats.
+  rpc GetReplicaIoStats (ListStatsOption) returns (ReplicaIoStatsResponse);
   // RPC to reset Io Stats for all Pool, Replica and Nexus hosted on the node.
   rpc ResetIoStats (google.protobuf.Empty) returns (google.protobuf.Empty);
 }
@@ -27,6 +29,17 @@ message PoolIoStatsResponse {
 /// Nexus IO stats response.
 message NexusIoStatsResponse {
   repeated IoStats stats = 1;
+}
+
+/// Replica IO stats response.
+message ReplicaIoStatsResponse {
+  repeated ReplicaIoStats stats = 1;
+}
+
+// Replica IO stats struct.
+message ReplicaIoStats {
+  optional string entity_id = 1; // Entity ID of the replica, If any.
+  IoStats stats = 2; // IO stats of the replica.
 }
 
 // Common IO stats struct for all resource types.
