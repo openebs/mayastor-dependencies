@@ -120,6 +120,8 @@ pub mod test {
 
 pub mod snapshot_rebuild {
     pub use super::pb::{
+        snapshot_rebuild::RebuildStatus,
+        snapshot_rebuild_rpc_client::SnapshotRebuildRpcClient,
         snapshot_rebuild_rpc_server::{SnapshotRebuildRpc, SnapshotRebuildRpcServer},
         CreateSnapshotRebuildRequest, DestroySnapshotRebuildRequest, ListSnapshotRebuildRequest,
         ListSnapshotRebuildResponse, SnapshotRebuild,
