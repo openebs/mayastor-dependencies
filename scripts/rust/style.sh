@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-FMT_OPTS=${FMT_OPTS:-"--check"}
+FMT_OPTS=${FMT_OPTS:-""}
 
 for d in `find -maxdepth 3 -name Cargo.toml -printf '%h\n' | grep -v "^./h2" | grep -v "git-version-macro"`; do
     pushd $d

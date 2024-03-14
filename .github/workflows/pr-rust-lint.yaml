@@ -7,15 +7,15 @@ jobs:
   rustlint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
-      - uses: cachix/install-nix-action@v22
+      - uses: cachix/install-nix-action@v26
         with:
-          nix_path: nixpkgs=channel:nixos-23.05
+          nix_path: nixpkgs=channel:nixos-23.11
       - name: nix-shell
         run: nix-shell --pure --run exit
       - name: cargo-clippy
-        run: nix-shell --run ./scripts/rust/linter.sh
+        run: nix-shell --pure --run ./scripts/rust/linter.sh
       - name: cargo-fmt
-        run: nix-shell --run ./scripts/rust/style.sh
+        run: nix-shell --pure --run ./scripts/rust/style.sh
