@@ -4,6 +4,8 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 
 import "common.proto";
+import "pool.proto";
+
 package mayastor.v1;
 
 service ReplicaRpc {
@@ -53,6 +55,7 @@ message Replica {
   bool is_clone = 12; // true: clone replica from snapshot, false: normal replica
   optional string snapshot_uuid = 13; // snapshot uuid from which the clone replica is created
   optional string entity_id = 14; // entity which owns the replica, if any
+  mayastor.v1.PoolType pooltype = 15; // type of the pool (eg: lvm, lvs)
 }
 
 message CreateReplicaRequest {
@@ -106,6 +109,7 @@ message ListReplicaOptions {
   google.protobuf.StringValue uuid = 3; // list the replica with the uuid if provided
   google.protobuf.StringValue pooluuid = 4; // list the replicas on the provided pool, by uuid
   Query query = 5; // list replica based on Query value
+  repeated mayastor.v1.PoolType pooltypes = 6; // types of the pool (eg: lvm, lvs), or all
 
   /// Query used for getting specific types of replicas. These are mutually exclusive, ex. a snapshot cannot be clone.
   message Query {
