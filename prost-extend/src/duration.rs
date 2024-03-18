@@ -110,7 +110,10 @@ pub enum DurationError {
 /// Converts proto duration to chrono's Duration
 impl From<Duration> for chrono::Duration {
     fn from(val: Duration) -> Self {
-        chrono::Duration::seconds(val.seconds) + chrono::Duration::nanoseconds(val.nanos as i64)
+        #[allow(deprecated)]
+        let duration = chrono::Duration::seconds(val.seconds)
+            + chrono::Duration::nanoseconds(val.nanos as i64);
+        duration
     }
 }
 /// Converts chrono Duration to proto duration
