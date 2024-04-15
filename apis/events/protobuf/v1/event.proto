@@ -63,6 +63,7 @@ enum EventAction {
   SubsystemResume = 22;
   Init = 23;
   Reconfiguring = 24;
+  NvmePathDeleting = 25;
 }
 
 // Event meta data
