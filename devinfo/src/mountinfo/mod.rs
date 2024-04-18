@@ -1,8 +1,5 @@
 use crate::{
-    mountinfo::{
-        bytebuf::ByteBuf,
-        error::{MountInfoError, Result},
-    },
+    mountinfo::error::{MountInfoError, Result},
     partition::PartitionID,
 };
 use io_utils::consistent_read;
@@ -17,9 +14,6 @@ use std::{
     sync::OnceLock,
 };
 
-/// Contains a type which is Sized and implements io::Read.
-/// Useful as a Read-able alternative to a Vec<u8>.
-mod bytebuf;
 /// Errors for MountInfo affairs.
 pub mod error;
 /// Contains tools to interact with files, etc.
@@ -240,6 +234,13 @@ pub struct SafeMountIter {
     mounts_filepath: PathBuf,
 }
 
+#[test]
+fn test_safe_mount() {
+    for mount in SafeMountIter::get().unwrap().flatten() {
+        println!("mount: {mount}");
+    }
+}
+
 impl SafeMountIter {
     /// Initialize (if not done already) and get a Result<MountIter>. Retry default no. of times.
     pub fn get() -> Result<MountIter<BufReader<Box<dyn io::Read>>>> {
@@ -285,9 +286,8 @@ impl SafeMountIter {
 
         // Decide if consistent read is required.
         if safe_mount_iter.kernel_has_mount_info_bug {
-            let buf: ByteBuf =
-                consistent_read(safe_mount_iter.mounts_filepath.as_path(), retries)?.into();
-            let buf: Box<dyn io::Read> = Box::new(buf);
+            let buf = consistent_read(safe_mount_iter.mounts_filepath.as_path(), retries)?;
+            let buf: Box<dyn io::Read> = Box::new(std::io::Cursor::new(buf));
             return Ok(MountIter::new_from_readable(buf));
         }
 
