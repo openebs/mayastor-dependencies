@@ -11,7 +11,7 @@ git-version-macro = { path = "../git-version-macro" }
 regex = "1"
 
 [features]
-default = [ "default-git-versions" ]
-default-git-versions = [ ]
-git-version-stale = [ "default-git-versions" ]
-git-version-fallback = [ ]
+default = [ "deps" ]
+deps = []
+deps-logs-head = [ "deps" ]
+deps-index = [ "deps" ]

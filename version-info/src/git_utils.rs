@@ -1,6 +1,6 @@
 use regex::Regex;
 
-#[cfg(feature = "default-git-versions")]
+#[cfg(feature = "deps")]
 mod default_version {
     /// Returns the git version as &'static str, in the long format:
     /// either tag, number of additional commits and the abbreviated commit name,
@@ -14,22 +14,31 @@ mod default_version {
             option_env!("GIT_VERSION_LONG").expect("git version fallback")
         }
 
-        #[cfg(not(any(feature = "git-version-stale", feature = "git-version-fallback")))]
-        let version = git_version_macro::git_version!(
-            args = ["--abbrev=12", "--always", "--long"],
-            fallback = fallback()
-        );
-
-        #[cfg(feature = "git-version-stale")]
-        #[cfg(not(feature = "git-version-fallback"))]
+        #[cfg(feature = "deps-logs-head")]
+        #[cfg(not(feature = "deps-index"))]
         let version = git_version_macro::git_version!(
             args = ["--abbrev=12", "--always", "--long"],
             fallback = fallback(),
             git_deps = ["logs/HEAD"]
         );
 
-        #[cfg(not(feature = "git-version-stale"))]
-        #[cfg(feature = "git-version-fallback")]
+        #[cfg(not(feature = "deps-logs-head"))]
+        #[cfg(feature = "deps-index")]
+        let version = git_version_macro::git_version!(
+            args = ["--abbrev=12", "--always", "--long"],
+            fallback = fallback(),
+            git_deps = ["index"]
+        );
+
+        #[cfg(all(feature = "deps-index", feature = "deps-logs-head"))]
+        let version = git_version_macro::git_version!(
+            args = ["--abbrev=12", "--always", "--long"],
+            fallback = fallback(),
+            git_deps = ["logs/HEAD", "index"]
+        );
+
+        #[cfg(not(feature = "deps-logs-head"))]
+        #[cfg(not(feature = "deps-index"))]
         let version = git_version_macro::git_version!(
             args = ["--abbrev=12", "--always", "--long"],
             fallback = fallback(),
@@ -49,22 +58,31 @@ mod default_version {
             option_env!("GIT_VERSION").expect("git version fallback")
         }
 
-        #[cfg(not(any(feature = "git-version-stale", feature = "git-version-fallback")))]
-        let version = git_version_macro::git_version!(
-            args = ["--abbrev=12", "--always"],
-            fallback = fallback()
-        );
-
-        #[cfg(feature = "git-version-stale")]
-        #[cfg(not(feature = "git-version-fallback"))]
+        #[cfg(feature = "deps-logs-head")]
+        #[cfg(not(feature = "deps-index"))]
         let version = git_version_macro::git_version!(
             args = ["--abbrev=12", "--always"],
             fallback = fallback(),
             git_deps = ["logs/HEAD"]
         );
 
-        #[cfg(feature = "git-version-fallback")]
-        #[cfg(not(feature = "git-version-stale"))]
+        #[cfg(not(feature = "deps-logs-head"))]
+        #[cfg(feature = "deps-index")]
+        let version = git_version_macro::git_version!(
+            args = ["--abbrev=12", "--always"],
+            fallback = fallback(),
+            git_deps = ["index"]
+        );
+
+        #[cfg(all(feature = "deps-index", feature = "deps-logs-head"))]
+        let version = git_version_macro::git_version!(
+            args = ["--abbrev=12", "--always"],
+            fallback = fallback(),
+            git_deps = ["logs/HEAD", "index"]
+        );
+
+        #[cfg(not(feature = "deps-logs-head"))]
+        #[cfg(not(feature = "deps-index"))]
         let version = git_version_macro::git_version!(
             args = ["--abbrev=12", "--always"],
             fallback = fallback(),
@@ -80,7 +98,7 @@ mod default_version {
     }
 }
 
-#[cfg(feature = "default-git-versions")]
+#[cfg(feature = "deps")]
 pub use default_version::{long_raw_version_str, raw_version_str, raw_version_string};
 
 /// Git version data.
