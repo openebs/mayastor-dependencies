@@ -230,12 +230,15 @@ pub struct SafeMountIter {
     /// This is the flag for the /proc/mounts linux bug. The bug has been fixed in
     /// commit 9f6c61f96f2d97 (v5.8+). This borrows the consistent read solution from
     /// k8s.io/mount-utils. Assumes bug exists by default, if version check fails.
+    #[allow(dead_code)]
     kernel_has_mount_info_bug: bool,
+    use_safe_mount: bool,
     mounts_filepath: PathBuf,
 }
 
 #[test]
 fn test_safe_mount() {
+    std::env::set_var("USE_SAFE_MOUNT", "always");
     for mount in SafeMountIter::get().unwrap().flatten() {
         println!("mount: {mount}");
     }
@@ -277,15 +280,22 @@ impl SafeMountIter {
 
             // Assume bug exists by default.
             let kernel_has_mount_info_bug = check_uname().unwrap_or(true);
-
+            let use_safe_mount = match std::env::var("USE_SAFE_MOUNT").unwrap_or_default().as_str()
+            {
+                "always" => true,
+                "n" | "no" => false,
+                "y" | "yes" => kernel_has_mount_info_bug,
+                _ => kernel_has_mount_info_bug,
+            };
             Self {
                 kernel_has_mount_info_bug,
+                use_safe_mount,
                 mounts_filepath: PathBuf::from("/proc/mounts"),
             }
         });
 
         // Decide if consistent read is required.
-        if safe_mount_iter.kernel_has_mount_info_bug {
+        if safe_mount_iter.use_safe_mount {
             let buf = consistent_read(safe_mount_iter.mounts_filepath.as_path(), retries)?;
             let buf: Box<dyn io::Read> = Box::new(std::io::Cursor::new(buf));
             return Ok(MountIter::new_from_readable(buf));
