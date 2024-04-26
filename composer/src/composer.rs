@@ -114,7 +114,7 @@ fn executable_path() -> PathBuf {
 }
 
 /// Path to local binary and arguments
-#[derive(Default, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Binary {
     path: PathBuf,
     arguments: Vec<String>,
@@ -278,7 +278,7 @@ impl std::str::FromStr for ImagePullPolicy {
 
 /// Specs of the allowed containers include only the binary path
 /// (relative to src) and the required arguments
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct ContainerSpec {
     /// Name of the container
     name: ContainerName,
@@ -392,7 +392,11 @@ impl ContainerSpec {
     /// If a key already exists, the value is replaced
     pub fn with_env(mut self, key: &str, val: &str) -> Self {
         if let Some(old) = self.env.insert(key.into(), val.into()) {
-            println!("Replaced key {key} val {old} with val {val}");
+            if old.is_empty() {
+                tracing::trace!("Set key {key}");
+            } else {
+                tracing::trace!("Replaced key {key} val \"{old}\" with val \"{val}\"");
+            }
         }
         self
     }

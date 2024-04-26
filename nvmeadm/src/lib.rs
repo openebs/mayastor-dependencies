@@ -53,7 +53,9 @@ where
     T::Err: ToString,
 {
     let path = dir.join(file);
-    let s = fs::read_to_string(&path).context(nvme_error::IoFailed {})?;
+    let s = fs::read_to_string(&path).context(nvme_error::IoFailed {
+        args: String::new(),
+    })?;
     let s = s.trim();
 
     match s.parse() {
