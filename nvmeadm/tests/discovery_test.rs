@@ -18,7 +18,7 @@ static CONFIG_TEXT: &str = "nexus_opts:
 
 const CONFIG_FILE: &str = "/tmp/nvmeadm_nvmf_target.yaml";
 
-const SERVED_DISK_NQN: &str = "nqn.2019-05.io.openebs:m0";
+const SERVED_DISK_NQN: &str = "nqn.2019-05.com.org:m0";
 
 const TARGET_PORT: u32 = 9523;
 

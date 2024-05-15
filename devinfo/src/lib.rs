@@ -32,7 +32,7 @@ pub enum DevInfoError {
 pub fn basic() {
     use std::convert::TryFrom;
 
-    let path = "nvmf://fooo/nqn.2019-05.io.openebs:00000000-76b6-4fcf-864d-1027d4038756";
+    let path = "nvmf://fooo/nqn.2019-05.com.org:00000000-76b6-4fcf-864d-1027d4038756";
     let dev = BlkDev::try_from(path).unwrap();
     let path = dev.lookup();
     dbg!(&path);

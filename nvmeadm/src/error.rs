@@ -4,8 +4,11 @@ use snafu::Snafu;
 #[allow(missing_docs)]
 #[snafu(visibility(pub(crate)), context(suffix(false)), module(nvme_error))]
 pub enum NvmeError {
-    #[snafu(display("IO error:"))]
-    IoFailed { source: std::io::Error },
+    #[snafu(display("IO error: {source}, args: {args}"))]
+    IoFailed {
+        source: std::io::Error,
+        args: String,
+    },
     #[snafu(display("Failed to parse {}: {}, {}", path, contents, error))]
     ValueParseFailed {
         path: String,
@@ -65,6 +68,9 @@ pub enum NvmeError {
 
 impl From<std::io::Error> for NvmeError {
     fn from(source: std::io::Error) -> NvmeError {
-        NvmeError::IoFailed { source }
+        NvmeError::IoFailed {
+            source,
+            args: "".to_string(),
+        }
     }
 }

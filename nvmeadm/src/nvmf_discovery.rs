@@ -28,7 +28,12 @@ use crate::{
 /// referred as.
 const MACHINE_UUID_PATH: &str = "/sys/class/dmi/id/product_uuid";
 
-static HOST_ID: once_cell::sync::Lazy<String> = once_cell::sync::Lazy::new(|| {
+struct HostInfo {
+    id: String,
+    nqn: String,
+    nqn_prefix: &'static str,
+}
+static HOST_INFO: once_cell::sync::Lazy<HostInfo> = once_cell::sync::Lazy::new(|| {
     let mut host_id = uuid::Uuid::new_v4().to_string();
     if let Ok(mut fd) = std::fs::File::open(MACHINE_UUID_PATH) {
         let mut content = String::new();
@@ -39,7 +44,12 @@ static HOST_ID: once_cell::sync::Lazy<String> = once_cell::sync::Lazy::new(|| {
             }
         }
     }
-    host_id
+    let nqn_prefix = "nqn.2014-08.org.nvmexpress:uuid";
+    HostInfo {
+        nqn: format!("{nqn_prefix}:{host_id}"),
+        nqn_prefix,
+        id: host_id,
+    }
 });
 
 /// The TrType struct for all known transports types note: we are missing loop
@@ -115,7 +125,7 @@ pub struct DiscoveryLogEntry {
     pub subnqn: String,
 }
 
-/// Creates a new Disovery struct to find new NVMe devices
+/// Creates a new Discovery struct to find new NVMe devices
 ///
 ///
 /// # Example
@@ -500,6 +510,9 @@ pub struct ConnectArgs {
     trsvcid: String,
     /// NQN of the target
     nqn: String,
+    /// When not specifying the nqn, use this as the prefix.
+    #[builder(default = "HOST_INFO.nqn_prefix.to_string()")]
+    default_hostnqn_prefix: String,
     /// Transport type
     #[builder(default = "TrType::tcp")]
     transport: TrType,
@@ -516,6 +529,8 @@ pub struct ConnectArgs {
     nr_io_queues: Option<u32>,
     #[builder(default = "None")]
     hostnqn: Option<String>,
+    #[builder(default = "None")]
+    hostid: Option<String>,
 }
 
 impl ConnectArgsBuilder {
@@ -542,14 +557,19 @@ impl fmt::Display for ConnectArgs {
     /// The output is used for writing to nvme-fabrics file so be careful
     /// when making changes.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let host_id = HOST_ID.as_str();
-        write!(f, "nqn={},", self.nqn)?;
-        if let Some(val) = &self.hostnqn {
-            write!(f, "hostnqn={val},")?;
-        } else {
-            write!(f, "hostnqn=nqn.2019-05.io.openebs.engine:{host_id},")?;
-        }
+        let g_host_nqn: String;
+        let (host_id, host_nqn) = match (&self.hostid, &self.hostnqn) {
+            (Some(host_id), Some(host_nqn)) => (host_id, host_nqn),
+            (Some(host_id), None) => {
+                g_host_nqn = format!("{prefix}:{host_id},", prefix = self.default_hostnqn_prefix);
+                (host_id, &g_host_nqn)
+            }
+            (None, None) => (&HOST_INFO.id, &HOST_INFO.nqn),
+            (None, Some(host_nqn)) => (&HOST_INFO.id, host_nqn),
+        };
+        write!(f, "hostnqn={host_nqn},")?;
         write!(f, "hostid={host_id},")?;
+        write!(f, "nqn={},", self.nqn)?;
         write!(f, "transport={},", self.transport)?;
         write!(f, "traddr={},", self.traddr)?;
         write!(f, "trsvcid={}", self.trsvcid)?;
@@ -604,10 +624,11 @@ impl ConnectArgs {
                 .context(ConnectFailed {
                     filename: NVME_FABRICS_PATH,
                 })?;
-        if let Err(e) = file.write_all(format!("{self}").as_bytes()) {
+        let args = format!("{self}");
+        if let Err(e) = file.write_all(args.as_bytes()) {
             return match e.kind() {
                 ErrorKind::AlreadyExists => Err(NvmeError::ConnectInProgress),
-                _ => Err(NvmeError::IoFailed { source: e }),
+                _ => Err(NvmeError::IoFailed { source: e, args }),
             };
         }
         let mut buf = String::new();
