@@ -23,6 +23,7 @@ service HostRpc {
 message MayastorFeatures {
   bool asymmetricNamespaceAccess = 1;
   bool logicalVolumeManager = 2;
+  bool snapshotRebuild = 3;
 }
 
 message MayastorInfoResponse {
