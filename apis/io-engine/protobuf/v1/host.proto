@@ -20,16 +20,15 @@ service HostRpc {
   rpc StatNvmeController (StatNvmeControllerRequest) returns (StatNvmeControllerResponse) {}
 }
 
-message MayastorFeatures {
+message BackCompatMayastorFeatures {
+  // NVMe ANA enablement status.
   bool asymmetricNamespaceAccess = 1;
-  bool logicalVolumeManager = 2;
-  bool snapshotRebuild = 3;
 }
 
 message MayastorInfoResponse {
   string version = 1;
-  MayastorFeatures supportedFeatures = 2;
-  RegisterRequest registration_info = 3;
+  BackCompatMayastorFeatures previous_features = 2;
+  RegisterRequest  registration_info = 3;
 }
 
 message BlockDevice {
