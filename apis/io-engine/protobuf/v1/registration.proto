@@ -2,6 +2,7 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
+import "common.proto";
 
 package mayastor.v1;
 
@@ -17,6 +18,12 @@ message RegisterRequest {
   repeated APIVersion api_version = 4;
   // nvme initiator hostnqn used by this instance
   google.protobuf.StringValue hostnqn = 5;
+  // Mayastor features.
+  optional MayastorFeatures features = 6;
+  // Mayastor bugfixes.
+  optional MayastorBugFixes bugfixes = 7;
+  // Version of mayastor.
+  optional string version = 8;
 }
 
 // api version supported by the dataplane

@@ -64,17 +64,21 @@ pub mod snapshot {
     };
 }
 pub mod registration {
-    pub use super::pb::{registration_client, ApiVersion, DeregisterRequest, RegisterRequest};
+    pub use super::pb::{
+        registration_client, ApiVersion, DeregisterRequest, MayastorBugFixes, MayastorFeatures,
+        RegisterRequest,
+    };
 }
 pub mod host {
     pub use super::pb::{
         block_device::{Filesystem, Partition},
         host_rpc_client::HostRpcClient,
         host_rpc_server::{HostRpc, HostRpcServer},
-        BlockDevice, GetMayastorResourceUsageResponse, ListBlockDevicesRequest,
-        ListBlockDevicesResponse, ListNvmeControllersResponse, MayastorFeatures,
-        MayastorInfoResponse, NvmeController, NvmeControllerIoStats, NvmeControllerState,
-        ResourceUsage, StatNvmeControllerRequest, StatNvmeControllerResponse,
+        BackCompatMayastorFeatures, BlockDevice, GetMayastorResourceUsageResponse,
+        ListBlockDevicesRequest, ListBlockDevicesResponse, ListNvmeControllersResponse,
+        MayastorBugFixes, MayastorFeatures, MayastorInfoResponse, NvmeController,
+        NvmeControllerIoStats, NvmeControllerState, ResourceUsage, StatNvmeControllerRequest,
+        StatNvmeControllerResponse,
     };
 }
 

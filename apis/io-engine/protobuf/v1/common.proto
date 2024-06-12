@@ -7,3 +7,17 @@ enum ShareProtocol {
   NVMF = 1; // NVMe over Fabrics (TCP)
   ISCSI = 2; // iSCSI
 }
+
+message MayastorFeatures {
+  // NVMe ANA enablement status.
+  bool asymmetricNamespaceAccess = 1;
+  // LVM backend presence and enablement status.
+  optional bool logicalVolumeManager = 2;
+  // SnapshotRebuild presence and enablement status.
+  optional bool snapshotRebuild = 3;
+}
+
+message MayastorBugFixes {
+  // Nexus rebuilds both the clusters allocated to the replica and its ancestors clusters
+  bool nexusRebuildReplicaAncestry = 1;
+}
