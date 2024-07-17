@@ -12,3 +12,9 @@ tonic-build = "0.10.2"
 chrono = "0.4.26"
 serde = { version = "1.0.183", features = [ "derive" ] }
 prost = "0.12.1"
+
+[dev-dependencies.serde]
+# v1.0.198 introduces a breaking change by making use of unstable feature saturating_int_impl!
+# Let's ensure we don't use v.1.0.198 or newer until we upgrade the compiler!
+# https://github.com/serde-rs/serde/issues/2734
+version = ">=1.0.188,<1.0.198"
