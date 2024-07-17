@@ -698,13 +698,13 @@ impl Builder {
 
     /// the name to be used as labels and network name
     pub fn name(mut self, name: &str) -> Builder {
-        self.name = name.to_owned();
+        self.name = name.to_string();
         self
     }
 
     /// set different label prefix for the network label
     pub fn label_prefix(mut self, prefix: &str) -> Builder {
-        self.label_prefix = prefix.to_owned();
+        self.label_prefix = prefix.to_string();
         self
     }
 
@@ -727,7 +727,7 @@ impl Builder {
     /// check if a container exists
     pub fn container_exists(&self, name: &str) -> bool {
         self.containers.iter().any(|(c, _)| c.name == name)
-            || self.existing_containers.get(name).is_some()
+            || self.existing_containers.contains_key(name)
     }
 
     /// add a generic container which runs a local binary
@@ -1103,7 +1103,7 @@ impl ComposeTest {
         for k in &containers {
             let name = k.id.clone().unwrap();
             tracing::trace!("Lookup container for removal: {:?}", k.names);
-            if prune || (self.prune_matching && self.containers.get(&name).is_some()) {
+            if prune || (self.prune_matching && self.containers.contains_key(&name)) {
                 prune_containers.push(async move {
                     let remove = self.remove_container(&name).await;
                     if remove.is_ok() {
@@ -1671,7 +1671,7 @@ impl ComposeTest {
             .await
             .unwrap_or_default();
 
-        self.containers.get(name).is_some()
+        self.containers.contains_key(name)
             || containers.iter().any(|c| {
                 c.names
                     .clone()
