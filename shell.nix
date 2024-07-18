@@ -1,4 +1,4 @@
-{ profile ? "nightly", date ? "2024-02-06" }:
+{ profile ? "nightly", version ? "2024-02-06" }:
 let
   sources = import ./nix/sources.nix;
   pkgs = import sources.nixpkgs {
@@ -8,7 +8,7 @@ let
 in
 let
   rust-bin =
-    (rust.rust-bin.${profile}.${date}.default.override {
+    (rust.rust-bin.${profile}.${version}.default.override {
       extensions = [ "rust-src" ];
     });
 in

@@ -23,3 +23,9 @@ prost = "0.12.1"
 chrono = "0.4.31"
 once_cell = "1.18.0"
 prost-extend = { path = "../../prost-extend" }
+
+[dev-dependencies.serde]
+# v1.0.198 introduces a breaking change by making use of unstable feature saturating_int_impl!
+# Let's ensure we don't use v.1.0.198 or newer until we upgrade the compiler!
+# https://github.com/serde-rs/serde/issues/2734
+version = ">=1.0.188,<1.0.198"
