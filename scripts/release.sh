@@ -46,6 +46,8 @@ dockerhub_tag_exists() {
     # so let's try it in the following format
     if [[ "$REGISTRY" =~ ':' ]]; then
       $CURL --silent -f -lSL http://"$REGISTRY"/v2/"${1#$REGISTRY}"/manifests/"$2" 1>/dev/null 2>&1
+    else
+      return 1
     fi
   fi
 }
@@ -224,6 +226,10 @@ parse_common_arg() {
       shift
       DEFAULT_IMAGES=
       IMAGES=
+      ;;
+    --tar)
+      shift
+      IMAGE_LOAD_TAR="yes"
       ;;
     --skip-build)
       SKIP_BUILD="yes"
@@ -451,8 +457,7 @@ build_images() {
       echo "Building $image:$TAG ..."
       $NIX_BUILD --out-link "$archive-image" -A "images.$BUILD_TYPE.$archive" --arg allInOne "$ALL_IN_ONE" --arg incremental "$INCREMENTAL" --argstr product_prefix "$PRODUCT_PREFIX"
       if [ -n "$CONTAINER_LOAD" ]; then
-        $DOCKER load -i "$archive-image"
-        $RM "$archive-image"
+        container_load "$archive-image"
         if [ "$image" != "$image_basename" ]; then
           echo "Renaming $image_basename:$TAG to $image:$TAG"
           $DOCKER tag "${image_basename}:$TAG" "$image:$TAG"
@@ -461,6 +466,31 @@ build_images() {
       fi
     fi
   done
+}
+
+# Load the container image into the host service.
+container_load() {
+  if [ -n "$IMAGE_LOAD_TAR" ]; then
+    container_load_tar "$1"
+  else
+    if ! $DOCKER load -i "$1"; then
+      if $DOCKER "version" | grep -i "podman" &>/dev/null; then
+        IMAGE_LOAD_TAR="yes"
+        echo_stderr "Failed to load compressed docker image on podman, trying uncompressed image..."
+        container_load_tar "$1"
+      else
+        return 1
+      fi
+    fi
+  fi
+
+  $RM "$1"
+}
+# Load the container image into the host service.
+container_load_tar() {
+  $ZCAT "$1" > "$1.tar"
+  $DOCKER load -i "$1.tar"
+  $RM "$1.tar"
 }
 
 upload_image_alias() {
@@ -480,10 +510,10 @@ upload_image() {
   tar=$3
 
   if [ -n "$CONTAINER_LOAD" ]; then
-    echo "Uploading $img:$TAG to registry ..."
-    $DOCKER push "$img:$TAG"
+    echo "Uploading $img:$tag to registry ..."
+    $DOCKER push "$img:$tag"
   elif [ -n "$tar" ]; then
-    echo "Uploading $img:$TAG to registry ..."
+    echo "Uploading $img:$tag to registry ..."
     exec_skopeo copy docker-archive:"$tar" docker://"$img:$tag"
   else
     die "Missing tar file... can't upload image"
@@ -558,6 +588,7 @@ common_help() {
   --skip-build               Don't perform nix-build.
   --skip-publish             Don't publish built images.
   --image           <image>  Specify what image to build and/or upload.
+  --tar                      Decompress and load images as tar rather than tar.gz.
   --skip-images              Don't build nor upload any images.
   --alias-tag       <tag>    Explicit alias for short commit hash tag.
   --tag             <tag>    Explicit tag (overrides the git tag).
@@ -581,6 +612,7 @@ TAR="tar"
 HELM="helm"
 CURL="curl"
 SKOPEO="skopeo"
+ZCAT="zcat"
 SCRIPT_DIR=$(dirname "$0")
 TAG=$(get_tag)
 HASH=$(get_hash)
@@ -606,11 +638,12 @@ CARGO_DEPS=${CARGO_DEPS:-${PROJECT:-}.project-builder.cargoDeps}
 SKIP_CARGO_DEPS=
 DEFAULT_IMAGES=$IMAGES
 IMAGES=
+IMAGE_LOAD_TAR=
 # Images which require helm chart dependency update
 HELM_DEPS_IMAGES=${HELM_DEPS_IMAGES:-}
 LOCAL_HELM=
 NIX_SOURCES=$(realpath "${NIX_SOURCES:-"$SCRIPT_DIR/../nix/sources.nix"}")
-DEFAULT_COMMON_BINS=("$CURL" "$DOCKER" "$TAR" "$RM" "$NIX_BUILD")
+DEFAULT_COMMON_BINS=("$CURL" "$DOCKER" "$TAR" "$RM" "$NIX_BUILD" "$ZCAT")
 COMMON_BINS=${COMMON_BINS:-"${DEFAULT_COMMON_BINS[@]}"}
 CONTAINER_LOAD="yes"
 LOCAL_SKOPEO=
