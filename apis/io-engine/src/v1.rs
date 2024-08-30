@@ -36,8 +36,9 @@ pub mod pool {
     pub use super::pb::{
         pool_rpc_client::PoolRpcClient,
         pool_rpc_server::{PoolRpc, PoolRpcServer},
-        CreatePoolRequest, DestroyPoolRequest, ExportPoolRequest, ImportPoolRequest,
-        ListPoolOptions, ListPoolsResponse, Pool, PoolState, PoolType, PoolTypeValue,
+        CreatePoolRequest, DestroyPoolRequest, ExportPoolRequest, GrowPoolRequest,
+        GrowPoolResponse, ImportPoolRequest, ListPoolOptions, ListPoolsResponse, Pool,
+        PoolMetadataArgs, PoolMetadataInfo, PoolState, PoolType, PoolTypeValue,
     };
 }
 

@@ -16,6 +16,7 @@ service PoolRpc {
   rpc ExportPool (ExportPoolRequest) returns (google.protobuf.Empty) {}
   rpc ImportPool (ImportPoolRequest) returns (Pool) {}
   rpc ListPools (ListPoolOptions) returns (ListPoolsResponse) {}
+  rpc GrowPool (GrowPoolRequest) returns (GrowPoolResponse) {}
 }
 
 // Specifies the type of the pool
@@ -33,14 +34,41 @@ message PoolTypeValue {
 
 // Create pool arguments.
 message CreatePoolRequest {
-  string name = 1;           // name of the pool
-  google.protobuf.StringValue uuid = 2; // optional uuid for the pool to be created
-  repeated string disks = 3; // disk device paths or URIs to be claimed by the pool
-  PoolType pooltype = 4;     // type of the pool
+  // Name of the pool.
+  string name = 1;
+  // Optional uuid for the pool to be created.
+  google.protobuf.StringValue uuid = 2;
+  // Disk device paths or URIs to be claimed by the pool.
+  repeated string disks = 3;
+  // Type of the pool.
+  PoolType pooltype = 4;
   // Default cluster size is 4MiB (4 * 1024 * 1024), input cluster size must be in "bytes" but
   // must be multiple of 1MiB, else default cluster size i.e 4MiB will be considered. Minimum
   // cluster size can be input as 1048576 (1024 * 1024) bytes (1MiB)
   optional uint32 cluster_size = 5;
+  // Optional pool metadata arguments.
+  optional PoolMetadataArgs md_args = 6;
+}
+
+// Pool metadata arguments.
+message PoolMetadataArgs {
+  // This parameter controls the initial metadata reservation for a storage pool.
+  // This parameter sets a ratio of the desired metadata reservation amount
+  // to the default reservation for the given pool type.
+  //
+  // 1.0 is the default value, and it means to reserve the amount
+  // of disk space for metadata which is default for the pool type.
+  //
+  // Values larger that 1.0 would increase amount of space reserved for metadata.
+  // For example, 2.0 would double the capacity reserved for metadata.
+  //
+  // Values smaller that 1.0 would decrease amount of space reserved for metadata.
+  // For example, 0.5 would half the capacity reserved for metadata.
+  //
+  // The actual amount of disk space in bytes reserved for metadata may
+  // depend on pool size, cluster size, and other pool parameters.
+  // A pool backend may also allow dynamic metadata allocation.
+   optional float md_resv_ratio = 1;
 }
 
 // Create pool arguments.
@@ -61,15 +89,52 @@ enum PoolState {
 
 // Storage pool properties
 message Pool {
-  string uuid = 1;            // uuid of the pool
-  string name = 2;            // name of the pool
-  repeated string disks = 3;  // absolute disk paths claimed by the pool
-  PoolState state = 4;        // current state of the pool
-  uint64 capacity = 5;        // size of the pool in bytes
-  uint64 used = 6;            // used bytes from the pool
-  PoolType pooltype = 7;      // type of the pool
-  uint64 committed = 8;       // committed size of all pool replicas (sum of capacities of all replicas)
-  uint32 cluster_size = 9;    // blobstor cluster size set (in bytes) during pool creation
+  // UUID of the storage pool.
+  string uuid = 1;
+  // Name of the storage pool.
+  string name = 2;
+  // Absolute path(s) of disk devices which are claimed by the pool.
+  repeated string disks = 3;
+  // Current state of the storage pool.
+  PoolState state = 4;
+  // Pool capacity in bytes available for user data.
+  uint64 capacity = 5;
+  // Storage capacity in bytes allocated for storing user data.
+  uint64 used = 6;
+  // Type of the pool.
+  PoolType pooltype = 7;
+  // Committed size of all pool's replicas: a sum of capacities of all replicas.
+  uint64 committed = 8;
+  // Cluster size in bytes. It defines the allocation granularity for replicas
+  // and snapshots. Cluster size can set during pool creation.
+  uint32 cluster_size = 9;
+  // Page size in bytes. This is the write and read granularity.
+  optional uint32 page_size = 10;
+  // Usable capacity of the pool's underlying storage device(s).
+  // It changes when the device's capacity changes.
+  // This value is equal or large than the current pool capacity. If it is larger,
+  // pool can be grown to fill the entire device's capacity.
+  // If the pool backend does not support disk capacity evaluation, zero is returned.
+  uint64 disk_capacity = 11;
+  // Optional pool metadata info.
+  optional PoolMetadataInfo md_info = 12;
+}
+
+// Pool medata info.
+message PoolMetadataInfo {
+  // Size of metadata allocation page in bytes.
+  uint32 md_page_size = 1;
+  // Number of metadata pages reserved on the pool for storing replica metadata.
+  // Metadata reservation capacity can be a limiting factor for the number
+  // of replicas and snaphots a pool can accommodate.
+  // Depending on the pool backend, this value can be defined on pool creation,
+  // or can dynamically change.
+  // If the pool backend does not support metadata capacity evaluation, zero is returned.
+  uint64 md_pages = 2;
+  // Number of metadata pages used for storing metadata for the currently
+  // existing replicas.
+  // If the pool backend does not support metadata capacity evaluation, zero is returned.
+  uint64 md_used_pages = 3;
 }
 
 // Destroy pool arguments.
@@ -93,4 +158,21 @@ message ListPoolOptions {
   google.protobuf.StringValue name = 1; // list the pools matching the name if provided
   PoolTypeValue pooltype = 2; // optional pooltype filter
   google.protobuf.StringValue uuid = 3; // get the pool matching the uuid if provided
+}
+
+// Grow pool arguments.
+message GrowPoolRequest {
+  string name = 1;                        // name of the pool
+  google.protobuf.StringValue uuid = 2;   // optional uuid for the pool to be grown
+}
+
+// Grow pool response.
+message GrowPoolResponse {
+  // Pool's state before expansion.
+  Pool previous_pool = 1;
+  // Pool's state after expansion.
+  // The difference between previous_pool and current_pool can be used
+  // to determine how much the pool has grown, and if the growth
+  // actually occurred.
+  Pool current_pool = 2;
 }
