@@ -73,6 +73,19 @@ impl fmt::Display for TrType {
     }
 }
 
+impl FromStr for TrType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "rdma" => Ok(Self::rdma),
+            "tcp" => Ok(Self::tcp),
+            "fc" => Ok(Self::fc),
+            invalid => Err(format!("Invalid transport type: {invalid}")),
+        }
+    }
+}
+
 /// AddressFamily, in case of TCP and RDMA we use IPv6 or IPc4 only
 #[derive(Clone, Debug, Primitive)]
 pub enum AddressFamily {
