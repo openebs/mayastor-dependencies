@@ -1,4 +1,4 @@
-use crate::{error, parse_value};
+use crate::{error, nvmf_discovery::TrType, parse_value};
 use error::{
     nvme_error::{FileIoFailed, InvalidPath, SubsystemFailure},
     NvmeError,
@@ -243,15 +243,22 @@ impl Subsystem {
 
     /// Returns the particular subsystem based on the nqn and address.
     // TODO: Optimize this code.
-    pub fn get(host: &str, port: &u16, nqn: &str) -> Result<Subsystem, NvmeError> {
+    pub fn get(
+        host: &str,
+        port: &u16,
+        transport: TrType,
+        nqn: &str,
+    ) -> Result<Subsystem, NvmeError> {
         let nvme_subsystems = NvmeSubsystems::new()?;
 
         let host = host.to_string();
         let sport = port.to_string();
-        match nvme_subsystems
-            .flatten()
-            .find(|subsys| subsys.nqn == *nqn && subsys.address.match_host_port(&host, &sport))
-        {
+        let trstring = transport.to_string();
+        match nvme_subsystems.flatten().find(|subsys| {
+            subsys.nqn == *nqn
+                && subsys.address.match_host_port(&host, &sport)
+                && subsys.transport.eq_ignore_ascii_case(trstring.as_str())
+        }) {
             None => Err(NvmeError::SubsystemNotFound {
                 nqn: nqn.to_string(),
                 host: host.to_string(),

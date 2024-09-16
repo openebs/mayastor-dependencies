@@ -53,7 +53,7 @@ static HOST_INFO: once_cell::sync::Lazy<HostInfo> = once_cell::sync::Lazy::new(|
 });
 
 /// The TrType struct for all known transports types note: we are missing loop
-#[derive(Clone, Debug, Primitive)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Primitive)]
 #[allow(non_camel_case_types)]
 pub enum TrType {
     rdma = 1,
@@ -70,6 +70,19 @@ impl Default for TrType {
 impl fmt::Display for TrType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{self:?}")
+    }
+}
+
+impl TryFrom<String> for TrType {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "rdma" => Ok(TrType::rdma),
+            "fc" => Ok(TrType::fc),
+            "tcp" => Ok(TrType::tcp),
+            _ => Err(format!("Invalid TrType: {}", value)),
+        }
     }
 }
 
