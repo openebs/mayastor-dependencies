@@ -436,7 +436,7 @@ build_helm_deps() {
 
 build_images() {
   for name in $IMAGES; do
-    image_basename=$($NIX_EVAL -f . "images.$BUILD_TYPE.$name.imageName" --raw --quiet --argstr product_prefix "$PRODUCT_PREFIX" 2>/dev/null)
+    image_basename=$($NIX_EVAL -f . "images.$BUILD_TYPE.$name.imageName" --raw --quiet --argstr product_prefix "$PRODUCT_PREFIX")
     image=$image_basename
     archive=$name
 
