@@ -526,7 +526,7 @@ impl ContainerSpec {
         if let Some(entrypoint) = &self.entrypoint {
             entrypoint.clone()
         } else if self.binary.is_some() && default_image.is_some() && self.init.unwrap_or(true) {
-            vec!["tini".to_string(), "--".to_string()]
+            vec!["/sbin/tini".to_string(), "--".to_string()]
         } else {
             vec![]
         }
