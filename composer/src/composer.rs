@@ -318,28 +318,20 @@ pub struct ContainerSpec {
 impl ContainerSpec {
     /// Create new ContainerSpec from name and binary
     pub fn from_binary(name: &str, binary: Binary) -> Self {
-        let mut env = binary.env.clone();
-        if !env.contains_key("RUST_LOG") {
-            env.insert("RUST_LOG".to_string(), RUST_LOG_DEFAULT.to_string());
-        }
-
         Self {
             name: name.into(),
+            env: binary.env.clone(),
             binary: Some(binary),
             init: Some(true),
-            env,
             ..Default::default()
         }
     }
     /// Create new ContainerSpec from name and image
     pub fn from_image(name: &str, image: &str) -> Self {
-        let mut env = HashMap::new();
-        env.insert("RUST_LOG".to_string(), RUST_LOG_DEFAULT.to_string());
         Self {
             name: name.into(),
             init: Some(true),
             image: Some(image.into()),
-            env,
             ..Default::default()
         }
     }
@@ -577,6 +569,10 @@ pub struct Builder {
     image: Option<String>,
     /// output container logs on panic
     logs_on_panic: bool,
+    /// Add custom RUST_LOG env.
+    rust_log: Option<String>,
+    /// Add custom RUST_LOG_SILENCE env.
+    rust_log_silence: Option<String>,
 }
 
 impl Default for Builder {
@@ -608,6 +604,8 @@ impl Builder {
             autorun: true,
             image: None,
             logs_on_panic: true,
+            rust_log: None,
+            rust_log_silence: None,
         }
     }
 
@@ -789,6 +787,17 @@ impl Builder {
         self
     }
 
+    /// If set, add RUST_LOG to all containers where it's not already set.
+    pub fn with_rust_log(mut self, rust_log: impl Into<Option<String>>) -> Builder {
+        self.rust_log = rust_log.into();
+        self
+    }
+    /// If set, add RUST_LOG_SILENCE to all containers where it's not already set.
+    pub fn with_rust_log_silence(mut self, rust_log_silence: impl Into<Option<String>>) -> Builder {
+        self.rust_log_silence = rust_log_silence.into();
+        self
+    }
+
     /// output logs on panic
     pub fn with_logs(mut self, enable: bool) -> Builder {
         self.logs_on_panic = enable;
@@ -919,6 +928,8 @@ impl Builder {
             prune_matching: self.prune_matching,
             image: self.image,
             logs_on_panic: self.logs_on_panic,
+            rust_log: self.rust_log,
+            rust_log_silence: self.rust_log_silence,
         };
 
         compose.network_id = compose.network_create().await.map_err(|e| e.to_string())?;
@@ -992,6 +1003,10 @@ pub struct ComposeTest {
     image: Option<String>,
     /// output container logs on panic
     logs_on_panic: bool,
+    /// Add custom RUST_LOG env.
+    rust_log: Option<String>,
+    /// Add custom RUST_LOG_SILENCE env.
+    rust_log_silence: Option<String>,
 }
 
 impl Drop for ComposeTest {
@@ -1235,6 +1250,27 @@ impl ComposeTest {
         Ok(())
     }
 
+    fn spec_environment(&self, spec: &ContainerSpec) -> Vec<String> {
+        let mut env = spec.environment();
+
+        if !spec.env.contains_key("RUST_LOG") {
+            let rust_log = if let Some(rust_log) = &self.rust_log {
+                rust_log.as_str()
+            } else {
+                RUST_LOG_DEFAULT
+            };
+            env.push(format!("RUST_LOG={rust_log}"));
+        }
+
+        if let Some(rust_log_silence) = &self.rust_log_silence {
+            if !spec.env.contains_key("RUST_LOG_SILENCE") {
+                env.push(format!("RUST_LOG_SILENCE={rust_log_silence}"));
+            }
+        }
+
+        env
+    }
+
     /// we need to construct several objects to create a setup that meets our
     /// liking:
     ///
@@ -1340,7 +1376,7 @@ impl ComposeTest {
             },
         );
 
-        let mut env = spec.environment();
+        let mut env = self.spec_environment(spec);
         env.push(format!("MY_POD_IP={ipv4}"));
 
         // figure out which ports to expose based on the port mapping
