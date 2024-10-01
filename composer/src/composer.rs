@@ -542,13 +542,17 @@ pub struct Builder {
     /// help you during debugging
     name: String,
     /// containers we want to create, note these are our containers only
-    containers: Vec<(ContainerSpec, Ipv4Addr)>,
+    containers: Vec<(ContainerSpec, Option<Ipv4Addr>)>,
     /// existing containers and their (IDs, Ipv4)
     existing_containers: HashMap<ContainerName, (ContainerId, Ipv4Addr)>,
     /// container shutdown order
     shutdown_order: Vec<ContainerName>,
     /// the network used by this experiment
     network: Ipv4Network,
+    /// network mode for the test.
+    /// XXX: Currently only use this to set 'host' mode if needed. Untested with
+    /// other modes.
+    network_mode: Option<String>,
     /// reuse existing containers
     reuse: bool,
     /// prefix for labels set on containers and networks
@@ -595,6 +599,7 @@ impl Builder {
             existing_containers: Default::default(),
             shutdown_order: vec![],
             network: TEST_NET_NETWORK.parse().expect("Valid network config"),
+            network_mode: None,
             reuse: false,
             label_prefix: TEST_LABEL_PREFIX.to_string(),
             allow_clean_on_panic: true,
@@ -654,7 +659,10 @@ impl Builder {
         for ip in 2 ..= 255u32 {
             if let Some(ip) = self.network.nth(ip) {
                 if self.existing_containers.values().all(|(_, e)| e != &ip)
-                    && self.containers.iter().all(|(_, e)| e != &ip)
+                    && self
+                        .containers
+                        .iter()
+                        .all(|(_, e)| e.is_some_and(|i| i != ip))
                 {
                     return Ok(ip);
                 }
@@ -691,6 +699,12 @@ impl Builder {
                     format!("Invalid network format: {error}"),
                 ),
             })?;
+        Ok(self)
+    }
+
+    /// set the network mode for this test.
+    pub fn network_mode(mut self, mode: &str) -> Result<Builder, Error> {
+        self.network_mode = Some(mode.to_string());
         Ok(self)
     }
 
@@ -734,11 +748,13 @@ impl Builder {
             tracing::debug!("Reusing container: {}", spec.name);
             let next_ip = container.1;
             self.existing_containers.remove(&spec.name);
-            self.containers.push((spec, next_ip));
+            self.containers.push((spec, Some(next_ip)));
+        } else if self.network_mode.as_ref().is_some_and(|n| n == "host") {
+            self.containers.push((spec, None));
         } else {
             let next_ip = self.next_ip().unwrap();
             tracing::debug!("Adding container: {}, ip: {}", spec.name, next_ip);
-            self.containers.push((spec, next_ip));
+            self.containers.push((spec, Some(next_ip)));
         }
         self
     }
@@ -917,9 +933,10 @@ impl Builder {
             srcdir,
             docker,
             network_id: "".to_string(),
+            network_mode: self.network_mode.clone(),
             containers: Default::default(),
             shutdown_order: self.shutdown_order,
-            ipam,
+            ipam: if self.network_mode.is_some() { None } else { Some(ipam) },
             label_prefix: self.label_prefix,
             reuse: self.reuse,
             allow_clean_on_panic: self.allow_clean_on_panic,
@@ -932,7 +949,12 @@ impl Builder {
             rust_log_silence: self.rust_log_silence,
         };
 
-        compose.network_id = compose.network_create().await.map_err(|e| e.to_string())?;
+        if self.network_mode.is_none() {
+            compose.network_id = compose.network_create().await.map_err(|e| e.to_string())?;
+        } else {
+            let host_nw = &compose.host_network().await?[0];
+            compose.network_id = host_nw.id.clone().unwrap();
+        }
 
         let compose_ref = &compose;
         let create_threads = self
@@ -978,14 +1000,18 @@ pub struct ComposeTest {
     docker: Docker,
     /// the network id is used to attach containers to networks
     network_id: NetworkId,
+    /// network mode for the test.
+    /// XXX: Currently only use this to set 'host' mode if needed. Untested with
+    /// other modes.
+    network_mode: Option<String>,
     /// the name of containers and their (IDs, Ipv4) we have created
     /// perhaps not an ideal data structure, but we can improve it later
     /// if we need to
-    containers: HashMap<ContainerName, (ContainerId, Ipv4Addr)>,
+    containers: HashMap<ContainerName, (ContainerId, Option<Ipv4Addr>)>,
     /// container shutdown order
     shutdown_order: Vec<ContainerName>,
     /// the default network configuration we use for our test cases
-    ipam: Ipam,
+    ipam: Option<Ipam>,
     /// prefix for labels set on containers and networks
     ///   $prefix.name = $name will be created automatically
     label_prefix: String,
@@ -1076,7 +1102,7 @@ impl ComposeTest {
             internal: false,
             attachable: true,
             ingress: false,
-            ipam: self.ipam.clone(),
+            ipam: self.ipam.clone().unwrap_or_default(),
             enable_ipv6: false,
             options: vec![("com.docker.network.bridge.name", "mayabridge0")]
                 .into_iter()
@@ -1167,6 +1193,17 @@ impl ComposeTest {
             .await
     }
 
+    /// get host network.
+    pub async fn host_network(&self) -> Result<Vec<Network>, Error> {
+        self.docker
+            .list_networks(Some(ListNetworksOptions {
+                filters: vec![("driver", vec!["host"])]
+                    .into_iter()
+                    .collect(),
+            }))
+            .await
+    }
+
     async fn list_network_containers(&self, name: &str) -> Result<Vec<ContainerSummary>, Error> {
         self.docker
             .list_containers(Some(ListContainersOptions {
@@ -1194,7 +1231,7 @@ impl ComposeTest {
     }
 
     /// Get a map of the loaded containers
-    pub fn containers(&self) -> &HashMap<ContainerName, (ContainerId, Ipv4Addr)> {
+    pub fn containers(&self) -> &HashMap<ContainerName, (ContainerId, Option<Ipv4Addr>)> {
         &self.containers
     }
 
@@ -1282,7 +1319,7 @@ impl ComposeTest {
     async fn create_container(
         &self,
         spec: &ContainerSpec,
-        ipv4: Ipv4Addr,
+        ipv4: Option<Ipv4Addr>,
     ) -> Result<ContainerCreateResponse, Error> {
         tracing::debug!("Creating container: {}", spec.name);
 
@@ -1359,6 +1396,7 @@ impl ComposeTest {
             security_opt: Some(vec!["seccomp=unconfined".into()]),
             init: spec.init,
             port_bindings: spec.port_map.clone(),
+            network_mode: self.network_mode.clone(),
             ..Default::default()
         };
 
@@ -1368,7 +1406,7 @@ impl ComposeTest {
             EndpointSettings {
                 network_id: Some(self.network_id.to_string()),
                 ipam_config: Some(EndpointIpamConfig {
-                    ipv4_address: Some(ipv4.to_string()),
+                    ipv4_address: ipv4.map(|ip| ip.to_string()),
                     ..Default::default()
                 }),
                 aliases: spec.network_aliases.clone(),
@@ -1376,8 +1414,8 @@ impl ComposeTest {
             },
         );
 
-        let mut env = self.spec_environment(spec);
-        env.push(format!("MY_POD_IP={ipv4}"));
+        let mut env = spec.environment();
+        env.push(format!("MY_POD_IP={:?}", ipv4.unwrap_or(Ipv4Addr::new(127, 0, 0, 1))));
 
         // figure out which ports to expose based on the port mapping
         let mut exposed_ports = HashMap::new();
@@ -1573,7 +1611,7 @@ impl ComposeTest {
                 ),
             })?;
         if !self.reuse || self.prune_matching {
-            tracing::debug!("Starting container: {}, ip: {}", name, id.1);
+            tracing::debug!("Starting container: {}, ip: {:?}", name, id.1);
             self.docker
                 .start_container::<&str>(id.0.as_str(), None)
                 .await?;
@@ -1691,13 +1729,13 @@ impl ComposeTest {
     /// get container ip
     pub fn container_ip(&self, name: &str) -> String {
         let (_id, ip) = self.containers.get(name).unwrap();
-        ip.to_string()
+        ip.map_or("".to_string(), |f| f.to_string())
     }
 
     /// get a reference to the container ip
-    pub fn container_ip_as_ref(&self, name: &str) -> &Ipv4Addr {
+    pub fn container_ip_as_ref(&self, name: &str) -> Option<&Ipv4Addr> {
         let (_id, ip) = self.containers.get(name).unwrap();
-        ip
+        ip.as_ref()
     }
 
     /// check if a container exists
