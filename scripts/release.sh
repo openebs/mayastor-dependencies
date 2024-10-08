@@ -399,7 +399,7 @@ exec_helm() {
   if [ -n "$LOCAL_HELM" ]; then
     $HELM $@
   else
-    $NIX_SHELL -p "(import (import $NIX_SOURCES).nixpkgs {}).kubernetes-helm-wrapped" --run "$HELM $@"
+    $NIX_SHELL -p "(import (import $NIX_SOURCES).helm-nixpkgs {}).kubernetes-helm" --run "$HELM $@"
   fi
 }
 

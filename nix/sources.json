@@ -1,4 +1,16 @@
 {
+    "helm-nixpkgs": {
+        "branch": "master",
+        "description": "Nix Packages collection & NixOS",
+        "homepage": "",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "6e521c81bdf97fa70326bb88b007879bf9b226bf",
+        "sha256": "0ilczcqv88yjlqx7j2lg3csyl1aaq3ackd9gmmsnwydj9y96ikp7",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/6e521c81bdf97fa70326bb88b007879bf9b226bf.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "nixpkgs": {
         "branch": "release-24.05",
         "description": "Nix Packages collection",
