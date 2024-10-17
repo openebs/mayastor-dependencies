@@ -257,6 +257,10 @@ parse_common_arg() {
       BUILD_BINARIES="$DEFAULT_BINARIES"
       shift
       ;;
+    --no-static-linking)
+      STATIC_LINKING="false"
+      shift
+      ;;
     --skip-bins)
       shift
       BUILD_BINARIES=
@@ -558,7 +562,7 @@ build_bins() {
     mkdir -p "$BINARY_OUT_LINK"
     for name in $BUILD_BINARIES; do
       echo "Building static $name ..."
-      $NIX_BUILD --out-link "$BINARY_OUT_LINK/$name" -A "$PROJECT.$BUILD_TYPE.$name" --arg static true
+      $NIX_BUILD --out-link "$BINARY_OUT_LINK/$name" -A "$PROJECT.$BUILD_TYPE.$name" --arg allInOne "$ALL_IN_ONE" --arg static "$STATIC_LINKING"
     done
   fi
 }
@@ -594,6 +598,7 @@ common_help() {
   --tag             <tag>    Explicit tag (overrides the git tag).
   --incremental              Builds components in two stages allowing for faster rebuilds during development.
   --build-bins               Builds all the static binaries.
+  --no-static-linking        Don't build the binaries with static linking.
   --build-bin                Specify which binary to build.
   --skip-bins                Don't build the static binaries.
   --build-binary-out <path>  Specify the outlink path for the binaries (otherwise it's the current directory).
@@ -631,6 +636,7 @@ ALL_IN_ONE="true"
 INCREMENTAL="false"
 DEFAULT_BINARIES=${BUILD_BINARIES:-}
 BUILD_BINARIES=
+STATIC_LINKING="true"
 BINARY_OUT_LINK="."
 CARGO_VENDOR_DIR=${CARGO_VENDOR_DIR:-}
 CARGO_VENDOR_ATTEMPTS=${CARGO_VENDOR_ATTEMPTS:-25}
