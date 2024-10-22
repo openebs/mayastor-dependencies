@@ -261,6 +261,11 @@ parse_common_arg() {
       STATIC_LINKING="false"
       shift
       ;;
+    --extra-build-args)
+      shift
+      CUSTOM_BUILD_ARGS="$1"
+      shift
+      ;;
     --skip-bins)
       shift
       BUILD_BINARIES=
@@ -334,6 +339,9 @@ setup() {
     NIX_BUILD="$NIX_BUILD $NIX_TAG_ARGS"
     TAG="$ALIAS_TAG"
     ALIAS_TAG=
+  fi
+  if [ -n "$CUSTOM_BUILD_ARGS" ]; then
+    NIX_BUILD="$NIX_BUILD $CUSTOM_BUILD_ARGS"
   fi
 }
 
@@ -599,6 +607,7 @@ common_help() {
   --incremental              Builds components in two stages allowing for faster rebuilds during development.
   --build-bins               Builds all the static binaries.
   --no-static-linking        Don't build the binaries with static linking.
+  --extra-build-args <args>  Build with custom $NIX_BUILD command args.
   --build-bin                Specify which binary to build.
   --skip-bins                Don't build the static binaries.
   --build-binary-out <path>  Specify the outlink path for the binaries (otherwise it's the current directory).
@@ -637,6 +646,7 @@ INCREMENTAL="false"
 DEFAULT_BINARIES=${BUILD_BINARIES:-}
 BUILD_BINARIES=
 STATIC_LINKING="true"
+CUSTOM_BUILD_ARGS=""
 BINARY_OUT_LINK="."
 CARGO_VENDOR_DIR=${CARGO_VENDOR_DIR:-}
 CARGO_VENDOR_ATTEMPTS=${CARGO_VENDOR_ATTEMPTS:-25}
