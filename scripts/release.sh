@@ -261,11 +261,6 @@ parse_common_arg() {
       STATIC_LINKING="false"
       shift
       ;;
-    --extra-build-args)
-      shift
-      CUSTOM_BUILD_ARGS="$1"
-      shift
-      ;;
     --skip-bins)
       shift
       BUILD_BINARIES=
@@ -339,9 +334,6 @@ setup() {
     NIX_BUILD="$NIX_BUILD $NIX_TAG_ARGS"
     TAG="$ALIAS_TAG"
     ALIAS_TAG=
-  fi
-  if [ -n "$CUSTOM_BUILD_ARGS" ]; then
-    NIX_BUILD="$NIX_BUILD $CUSTOM_BUILD_ARGS"
   fi
 }
 
@@ -467,7 +459,7 @@ build_images() {
     # the images we already have locally.
     if [ -z "$SKIP_BUILD" ]; then
       echo "Building $image:$TAG ..."
-      $NIX_BUILD --out-link "$archive-image" -A "images.$BUILD_TYPE.$archive" --arg allInOne "$ALL_IN_ONE" --arg incremental "$INCREMENTAL" --argstr product_prefix "$PRODUCT_PREFIX"
+      $NIX_BUILD --out-link "$archive-image" -A "images.$BUILD_TYPE.$archive" --arg allInOne "$ALL_IN_ONE" --arg incremental "$INCREMENTAL" --argstr product_prefix "$PRODUCT_PREFIX" --argstr rustFlags "$RUSTFLAGS"
       if [ -n "$CONTAINER_LOAD" ]; then
         container_load "$archive-image"
         if [ "$image" != "$image_basename" ]; then
@@ -570,7 +562,7 @@ build_bins() {
     mkdir -p "$BINARY_OUT_LINK"
     for name in $BUILD_BINARIES; do
       echo "Building static $name ..."
-      $NIX_BUILD --out-link "$BINARY_OUT_LINK/$name" -A "$PROJECT.$BUILD_TYPE.$name" --arg allInOne "$ALL_IN_ONE" --arg static "$STATIC_LINKING"
+      $NIX_BUILD --out-link "$BINARY_OUT_LINK/$name" -A "$PROJECT.$BUILD_TYPE.$name" --arg allInOne "$ALL_IN_ONE" --arg static "$STATIC_LINKING" --argstr rustFlags "$RUSTFLAGS"
     done
   fi
 }
@@ -607,12 +599,14 @@ common_help() {
   --incremental              Builds components in two stages allowing for faster rebuilds during development.
   --build-bins               Builds all the static binaries.
   --no-static-linking        Don't build the binaries with static linking.
-  --extra-build-args <args>  Build with custom $NIX_BUILD command args.
   --build-bin                Specify which binary to build.
   --skip-bins                Don't build the static binaries.
   --build-binary-out <path>  Specify the outlink path for the binaries (otherwise it's the current directory).
   --skopeo-copy              Don't load containers into host, simply copy them to registry with skopeo.
   --skip-cargo-deps          Don't prefetch the cargo build dependencies.
+
+Environment Variables:
+  RUSTFLAGS                  Set Rust compiler options when building binaries.
 EOF
 }
 
@@ -646,7 +640,6 @@ INCREMENTAL="false"
 DEFAULT_BINARIES=${BUILD_BINARIES:-}
 BUILD_BINARIES=
 STATIC_LINKING="true"
-CUSTOM_BUILD_ARGS=""
 BINARY_OUT_LINK="."
 CARGO_VENDOR_DIR=${CARGO_VENDOR_DIR:-}
 CARGO_VENDOR_ATTEMPTS=${CARGO_VENDOR_ATTEMPTS:-25}
