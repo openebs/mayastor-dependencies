@@ -24,6 +24,7 @@ use bollard::{
 use futures::{StreamExt, TryStreamExt};
 use ipnetwork::Ipv4Network;
 use once_cell::sync::OnceCell;
+use strum_macros::{Display, EnumString};
 
 use bollard::{
     auth::DockerCredentials,
@@ -44,6 +45,13 @@ pub const TEST_NET_NAME: &str = "engine-testing-network";
 pub const TEST_LABEL_PREFIX: &str = "io.composer.test";
 pub const TEST_NET_NETWORK: &str = "10.1.0.0/16";
 
+#[derive(Clone, EnumString, Display, Debug, PartialEq)]
+pub enum NetworkMode {
+    #[strum(serialize = "host")]
+    Host,
+    #[strum(serialize = "bridge")]
+    Bridge,
+}
 /// Additional configuration.
 #[derive(Default, Debug)]
 struct AdditionalConfig {
@@ -549,6 +557,10 @@ pub struct Builder {
     shutdown_order: Vec<ContainerName>,
     /// the network used by this experiment
     network: Ipv4Network,
+    /// network mode for the test.
+    /// XXX: Currently only use this to set 'host' mode if needed. Untested with
+    /// other modes.
+    network_mode: Option<NetworkMode>,
     /// reuse existing containers
     reuse: bool,
     /// prefix for labels set on containers and networks
@@ -595,6 +607,7 @@ impl Builder {
             existing_containers: Default::default(),
             shutdown_order: vec![],
             network: TEST_NET_NETWORK.parse().expect("Valid network config"),
+            network_mode: None,
             reuse: false,
             label_prefix: TEST_LABEL_PREFIX.to_string(),
             allow_clean_on_panic: true,
@@ -694,6 +707,12 @@ impl Builder {
         Ok(self)
     }
 
+    /// set the network mode for this test.
+    pub fn network_mode(mut self, mode: NetworkMode) -> Result<Builder, Error> {
+        self.network_mode = Some(mode);
+        Ok(self)
+    }
+
     /// the name to be used as labels and network name
     pub fn name(mut self, name: &str) -> Builder {
         self.name = name.to_string();
@@ -736,7 +755,11 @@ impl Builder {
             self.existing_containers.remove(&spec.name);
             self.containers.push((spec, next_ip));
         } else {
-            let next_ip = self.next_ip().unwrap();
+            let next_ip = if self.network_mode == Some(NetworkMode::Host) {
+                Ipv4Addr::new(127, 0, 0, 1)
+            } else {
+                self.next_ip().unwrap()
+            };
             tracing::debug!("Adding container: {}, ip: {}", spec.name, next_ip);
             self.containers.push((spec, next_ip));
         }
@@ -917,9 +940,14 @@ impl Builder {
             srcdir,
             docker,
             network_id: "".to_string(),
+            network_mode: self.network_mode.clone(),
             containers: Default::default(),
             shutdown_order: self.shutdown_order,
-            ipam,
+            ipam: if self.network_mode == Some(NetworkMode::Host) {
+                None
+            } else {
+                Some(ipam)
+            },
             label_prefix: self.label_prefix,
             reuse: self.reuse,
             allow_clean_on_panic: self.allow_clean_on_panic,
@@ -932,7 +960,12 @@ impl Builder {
             rust_log_silence: self.rust_log_silence,
         };
 
-        compose.network_id = compose.network_create().await.map_err(|e| e.to_string())?;
+        if self.network_mode == Some(NetworkMode::Host) {
+            let host_nw = &compose.host_network().await?[0];
+            compose.network_id = host_nw.id.clone().unwrap();
+        } else {
+            compose.network_id = compose.network_create().await.map_err(|e| e.to_string())?;
+        }
 
         let compose_ref = &compose;
         let create_threads = self
@@ -978,6 +1011,10 @@ pub struct ComposeTest {
     docker: Docker,
     /// the network id is used to attach containers to networks
     network_id: NetworkId,
+    /// network mode for the test.
+    /// XXX: Currently only use this to set 'host' mode if needed. Untested with
+    /// other modes.
+    network_mode: Option<NetworkMode>,
     /// the name of containers and their (IDs, Ipv4) we have created
     /// perhaps not an ideal data structure, but we can improve it later
     /// if we need to
@@ -985,7 +1022,7 @@ pub struct ComposeTest {
     /// container shutdown order
     shutdown_order: Vec<ContainerName>,
     /// the default network configuration we use for our test cases
-    ipam: Ipam,
+    ipam: Option<Ipam>,
     /// prefix for labels set on containers and networks
     ///   $prefix.name = $name will be created automatically
     label_prefix: String,
@@ -1076,7 +1113,7 @@ impl ComposeTest {
             internal: false,
             attachable: true,
             ingress: false,
-            ipam: self.ipam.clone(),
+            ipam: self.ipam.clone().unwrap_or_default(),
             enable_ipv6: false,
             options: vec![("com.docker.network.bridge.name", "mayabridge0")]
                 .into_iter()
@@ -1163,6 +1200,15 @@ impl ComposeTest {
                 filters: vec![("label", vec![self.label_prefix().as_str()])]
                     .into_iter()
                     .collect(),
+            }))
+            .await
+    }
+
+    /// get host network.
+    pub async fn host_network(&self) -> Result<Vec<Network>, Error> {
+        self.docker
+            .list_networks(Some(ListNetworksOptions {
+                filters: vec![("driver", vec!["host"])].into_iter().collect(),
             }))
             .await
     }
@@ -1359,6 +1405,7 @@ impl ComposeTest {
             security_opt: Some(vec!["seccomp=unconfined".into()]),
             init: spec.init,
             port_bindings: spec.port_map.clone(),
+            network_mode: self.network_mode.as_ref().map(|n| n.to_string()),
             ..Default::default()
         };
 
@@ -1368,7 +1415,11 @@ impl ComposeTest {
             EndpointSettings {
                 network_id: Some(self.network_id.to_string()),
                 ipam_config: Some(EndpointIpamConfig {
-                    ipv4_address: Some(ipv4.to_string()),
+                    ipv4_address: if self.network_mode == Some(NetworkMode::Host) {
+                        None
+                    } else {
+                        Some(ipv4.to_string())
+                    },
                     ..Default::default()
                 }),
                 aliases: spec.network_aliases.clone(),
