@@ -5,27 +5,26 @@ edition = "2021"
 
 
 [build-dependencies]
-tonic-build = "0.10.2"
+tonic-build = "0.12.3"
+
+[features]
+default = ["rls-ring"]
+rls-aws-lc-rs = ["async-nats/aws-lc-rs"]
+rls-ring = ["async-nats/ring"]
 
 [dependencies]
-async-nats = "0.32.1"
-bytes = "1.5.0"
-serde = "1.0.188"
-serde_json = "1.0.107"
-tokio = "1.32.0"
-tracing = "0.1.37"
-uuid = { version = "1.4.1", features = ["v4"] }
-async-trait = "0.1.73"
-futures = "0.3.28"
-snafu = "0.7.5"
-tonic = "0.10.2"
-prost = "0.12.1"
-chrono = "0.4.31"
-once_cell = "1.18.0"
+async-nats = { version = "0.37.0", default-features = false }
+bytes = "1.8.0"
+serde = "1.0.214"
+serde_json = "1.0.132"
+tokio = "1.41.0"
+tracing = "0.1.40"
+uuid = { version = "1.11.0", features = ["v4"] }
+async-trait = "0.1.83"
+futures = "0.3.31"
+snafu = "0.8.5"
+tonic = "0.12.3"
+prost = "0.13.3"
+chrono = "0.4.38"
+once_cell = "1.20.2"
 prost-extend = { path = "../../prost-extend" }
-
-[dev-dependencies.serde]
-# v1.0.198 introduces a breaking change by making use of unstable feature saturating_int_impl!
-# Let's ensure we don't use v.1.0.198 or newer until we upgrade the compiler!
-# https://github.com/serde-rs/serde/issues/2734
-version = ">=1.0.188,<1.0.198"

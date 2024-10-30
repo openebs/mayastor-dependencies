@@ -100,7 +100,6 @@ impl FromStr for MountInfo {
 
 impl MountInfo {
     /// Attempt to parse a `/proc/mounts`-like line.
-
     fn fetch_from_disk_by_path(path: &str) -> io::Result<PathBuf> {
         PartitionID::from_disk_by_path(path)
             .map_err(|why| Error::new(ErrorKind::InvalidData, format!("{path}: {why}")))?

@@ -187,9 +187,10 @@ fn disconnect_test() {
 fn test_against_real_target() {
     // Disconnect all pre-existing NVMe connections to make sure new controller
     // always gets id = 0.
-    let _nvme_disconnect = Command::new("nvme")
+    Command::new("nvme")
         .arg("disconnect-all")
         .spawn()
+        .and_then(|mut child| child.wait())
         .expect("Failed to cleanup NVMe connections !");
 
     // Start an SPDK-based nvmf target

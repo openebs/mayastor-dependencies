@@ -10,7 +10,7 @@ fn main() {
         .build_server(true)
         .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
         .extern_path(".google.protobuf.Timestamp", "::prost_extend::Timestamp")
-        .compile(&["protobuf/mayastor.proto"], &["protobuf"])
+        .compile_protos(&["protobuf/mayastor.proto"], &["protobuf"])
         .unwrap_or_else(|e| panic!("io-engine protobuf compilation failed: {}", e));
 
     tonic_build::configure()
@@ -19,7 +19,7 @@ fn main() {
         .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
         .extern_path(".google.protobuf.Timestamp", "::prost_extend::Timestamp")
         .extern_path(".google.protobuf.Duration", "::prost_extend::Duration")
-        .compile(
+        .compile_protos(
             &[
                 "protobuf/v1/bdev.proto",
                 "protobuf/v1/json.proto",

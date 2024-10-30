@@ -1782,13 +1782,11 @@ impl ComposeTest {
                 tracing::trace!("Stopping {name:?}/{id}");
                 self.stop_id(&id)
                     .await
-                    .map_err(|error| {
+                    .inspect_err(|_| {
                         tracing::trace!("Failed to stop {name:?}/{id}");
-                        error
                     })
-                    .map(|ok| {
+                    .inspect(|_| {
                         tracing::trace!("Stopped {name:?}/{id}");
-                        ok
                     })
             })
             .collect::<Vec<_>>();

@@ -5,6 +5,6 @@ fn main() {
             "google.protobuf.Duration",
             "#[derive(serde::Serialize, serde::Deserialize)] #[serde(default)]",
         )
-        .compile(&["protobuf/v1/pb_time.proto"], &["protobuf/"])
+        .compile_protos(&["protobuf/v1/pb_time.proto"], &["protobuf/"])
         .unwrap_or_else(|e| panic!("prost-extend v1 protobuf compilation failed: {e}"));
 }
