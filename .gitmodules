@@ -1,4 +1,4 @@
 [submodule "h2"]
 	path = h2
 	url = https://github.com/openebs/h2.git
-	branch = v0.3-auth-fix
+	branch = v0.4.x

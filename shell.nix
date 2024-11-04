@@ -1,4 +1,4 @@
-{ profile ? "nightly", version ? "2024-02-06" }:
+{ profile ? "nightly", version ? "2024-10-30" }:
 let
   sources = import ./nix/sources.nix;
   pkgs = import sources.nixpkgs {
@@ -35,7 +35,15 @@ pkgs.mkShell {
   NODE_PATH = "${nodePackages."@commitlint/config-conventional"}/lib/node_modules";
 
   shellHook = ''
-    pre-commit install
-    pre-commit install --hook commit-msg
+    if [ -z "$CI" ] && [ "$IN_NIX_SHELL" = "impure" ]; then
+      pre-commit install
+      pre-commit install --hook commit-msg
+    fi
+
+    if [ -d ~/.cargo/bin ]; then
+      # Adding ~/.cargo/bin to the path let's us carry on using rustup but it lowers its
+      # priority: https://github.com/rust-lang/cargo/pull/11023
+      export PATH=$PATH:~/.cargo/bin
+    fi
   '';
 }

@@ -671,7 +671,6 @@ impl ConnectArgs {
 ///  ```rust
 ///  let num_disconnects = nvmeadm::nvmf_discovery::disconnect("mynqn");
 ///  ```
-
 pub fn disconnect(nqn: &str) -> Result<usize, NvmeError> {
     let subsys: Result<Vec<Subsystem>, NvmeError> = NvmeSubsystems::new()?
         .filter_map(Result::ok)

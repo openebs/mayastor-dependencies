@@ -79,7 +79,7 @@ impl TryFrom<Timestamp> for DateTime<Utc> {
 /// Converts proto timestamp to chrono's DateTime<Utc>.
 impl Timestamp {
     fn date_time_utc(&self) -> DateTime<Utc> {
-        DateTime::<Utc>::try_from(self.clone()).expect("invalid or out-of-range datetime")
+        DateTime::<Utc>::try_from(*self).expect("invalid or out-of-range datetime")
     }
 }
 
@@ -114,7 +114,7 @@ impl<'de> Deserialize<'de> for Timestamp {
     {
         struct TimestampVisitor;
 
-        impl<'de> Visitor<'de> for TimestampVisitor {
+        impl Visitor<'_> for TimestampVisitor {
             type Value = Timestamp;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

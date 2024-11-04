@@ -2,16 +2,13 @@
 name = "version-info"
 version = "0.1.0"
 edition = "2018"
-authors = [
-  "Dmitry Savitskiy <dmitry.savitsky@mayadata.io>",
-]
 
 [dependencies]
 git-version-macro = { path = "../git-version-macro" }
 regex = "1"
 
 [features]
-default = [ "deps" ]
+default = ["deps"]
 deps = []
-deps-logs-head = [ "deps" ]
-deps-index = [ "deps" ]
+deps-logs-head = ["deps"]
+deps-index = ["deps"]

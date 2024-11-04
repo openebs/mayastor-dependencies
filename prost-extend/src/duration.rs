@@ -9,7 +9,7 @@ const NANOS_MAX: i32 = NANOS_PER_SECOND - 1;
 
 impl fmt::Display for Duration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut d = self.clone();
+        let mut d = *self;
         d.normalize();
         if self.seconds < 0 && self.nanos < 0 {
             write!(f, "-")?;

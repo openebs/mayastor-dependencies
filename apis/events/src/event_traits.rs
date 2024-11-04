@@ -6,11 +6,10 @@ use crate::event::{
     SwitchOverEventDetails, SwitchOverStatus, Version,
 };
 use chrono::{DateTime, Utc};
-use once_cell::sync::OnceCell;
 use std::{str::FromStr, time::Duration};
 
 /// Once cell static variable to store the component field of the event source.
-static COMPONENT: OnceCell<Component> = OnceCell::new();
+static COMPONENT: std::sync::OnceLock<Component> = std::sync::OnceLock::new();
 
 /// Initialize the event source component with the service name.
 pub fn initialize_source_component(comp: &str) {
