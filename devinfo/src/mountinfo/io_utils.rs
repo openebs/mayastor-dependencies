@@ -13,7 +13,7 @@ pub(crate) fn consistent_read<P: AsRef<Path>>(
     let mut current_content = read(path.as_ref())?;
 
     let retries = retry_count.unwrap_or(DEFAULT_RETRY_COUNT);
-    for _ in 0 ..= retries {
+    for _ in 0..=retries {
         let new_content = read(path.as_ref())?;
 
         if new_content.eq(&current_content) {

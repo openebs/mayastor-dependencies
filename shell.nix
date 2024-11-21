@@ -1,4 +1,4 @@
-{ profile ? "nightly", version ? "2024-10-30" }:
+{ profile ? "stable", version ? "1.82.0" }:
 let
   sources = import ./nix/sources.nix;
   pkgs = import sources.nixpkgs {
