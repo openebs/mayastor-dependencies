@@ -47,7 +47,7 @@ fn wait_for_engine_ready(listening_port: u32) -> Result<(), String> {
     let dest = format!("127.0.0.1:{listening_port}");
     let socket_addr: SocketAddr = dest.parse().expect("Badly formed address");
 
-    for _ in 1 .. 20 {
+    for _ in 1..20 {
         let result = TcpStream::connect_timeout(&socket_addr, Duration::from_millis(100));
 
         if result.is_ok() {
