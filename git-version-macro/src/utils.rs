@@ -1,6 +1,4 @@
-use std::ffi::OsStr;
-use std::path::PathBuf;
-use std::process::Command;
+use std::{ffi::OsStr, path::PathBuf, process::Command};
 
 /// Remove a trailing newline from a byte string.
 fn strip_trailing_newline(mut input: Vec<u8>) -> Vec<u8> {
