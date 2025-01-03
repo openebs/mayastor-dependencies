@@ -263,6 +263,7 @@ impl Subsystem {
                 nqn: nqn.to_string(),
                 host: host.to_string(),
                 port: *port,
+                transport: transport.to_string(),
             }),
             Some(subsys) => Ok(subsys),
         }

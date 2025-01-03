@@ -27,15 +27,17 @@ pub enum NvmeError {
     #[snafu(display("No nvmf subsystems found"))]
     NoSubsystems,
     #[snafu(display(
-        "Nvmf subsystem with nqn: {}, host: {}, port: {} not found",
+        "Nvmf subsystem with nqn: {}, host: {}, port: {}, transport: {} not found",
         nqn,
         host,
-        port
+        port,
+        transport
     ))]
     SubsystemNotFound {
         nqn: String,
         host: String,
         port: u16,
+        transport: String,
     },
     #[snafu(display("Connect in progress"))]
     ConnectInProgress,
