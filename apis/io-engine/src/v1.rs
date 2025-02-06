@@ -11,7 +11,7 @@ mod pb {
 }
 
 pub mod common {
-    pub use super::pb::ShareProtocol;
+    pub use super::pb::{Cipher, Encryption, EncryptionKey, ShareProtocol};
 }
 
 /// v1 version of bdev grpc API
