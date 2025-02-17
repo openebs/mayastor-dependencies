@@ -3,6 +3,7 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
+import "common.proto";
 
 package mayastor.v1;
 
@@ -48,6 +49,8 @@ message CreatePoolRequest {
   optional uint32 cluster_size = 5;
   // Optional pool metadata arguments.
   optional PoolMetadataArgs md_args = 6;
+  // Encryption parameters for this pool.
+  optional Encryption encryption = 7;
 }
 
 // Pool metadata arguments.
@@ -77,6 +80,8 @@ message ImportPoolRequest {
   google.protobuf.StringValue uuid = 2; // optional uuid for the pool to be imported
   repeated string disks = 3; // disk device paths or URIs to be claimed by the pool
   PoolType pooltype = 4;     // type of the pool
+  // Encryption parameters for this pool.
+  optional Encryption encryption = 5;
 }
 
 // State of the storage pool (terminology comes from ZFS).
