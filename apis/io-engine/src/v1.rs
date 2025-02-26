@@ -11,7 +11,10 @@ mod pb {
 }
 
 pub mod common {
-    pub use super::pb::{Cipher, Encryption, EncryptionKey, ShareProtocol};
+    pub use super::pb::{
+        create_pool_request, import_pool_request, Cipher, EncryptionData, EncryptionKey,
+        EncryptionSecret, ShareProtocol,
+    };
 }
 
 /// v1 version of bdev grpc API
