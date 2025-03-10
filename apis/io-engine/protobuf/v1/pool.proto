@@ -131,6 +131,8 @@ message Pool {
   uint64 disk_capacity = 11;
   // Optional pool metadata info.
   optional PoolMetadataInfo md_info = 12;
+  // Is the pool encrypted.
+  optional bool encrypted = 13;
 }
 
 // Pool medata info.
