@@ -17,6 +17,8 @@ message MayastorFeatures {
   optional bool snapshotRebuild = 3;
   // RDMA support for Mayastor nvmf target.
   optional bool rdmaCapableIoEngine = 4;
+  // Diskpool encryption capability.
+  optional bool diskpoolEncryption = 5;
 }
 
 message MayastorBugFixes {
