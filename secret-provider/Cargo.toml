@@ -10,7 +10,9 @@ async-trait = "0.1"
 tokio = { version = "1", features = ["fs", "macros", "rt-multi-thread"] }
 k8s-openapi = { version = "0.22.0", features = ["v1_24"] }
 kube = { version = "0.94.2", features = ["derive", "runtime"] }
+platform = { path = "../platform" }
 snafu = "0.8.5"
+tracing = "0.1.40"
 
 [[example]]
 name = "secret-provider-example"
