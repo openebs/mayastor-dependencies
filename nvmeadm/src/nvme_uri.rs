@@ -41,6 +41,8 @@ impl TryFrom<&str> for NvmeTarget {
             .ok_or(NvmeError::InvalidUri {
                 source: ParseError::EmptyHost,
             })?
+            .trim_start_matches("[")
+            .trim_end_matches("]")
             .into();
 
         let subnqn = match url.path_segments() {
