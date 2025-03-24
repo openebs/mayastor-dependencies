@@ -56,6 +56,8 @@ message Replica {
   optional string snapshot_uuid = 13; // snapshot uuid from which the clone replica is created
   optional string entity_id = 14; // entity which owns the replica, if any
   mayastor.v1.PoolType pooltype = 15; // type of the pool (eg: lvm, lvs)
+  // Is the replica encrypted.
+  optional bool encrypted = 16;
 }
 
 message CreateReplicaRequest {
