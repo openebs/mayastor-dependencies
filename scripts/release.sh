@@ -421,11 +421,14 @@ build_helm_deps() {
   if [ -z "$build_deps" ]; then
     return
   fi
+  if [ -z "$HELM_CHART_DIR" ]; then
+    die "Some of the images require `helm dependency update` on the helm chart, but the chart directory is not set"
+  fi
 
   echo "Updating helm chart dependencies ..."
-  # Helm chart directory path -- /scripts --> /chart
-  chart_dir="$SCRIPT_DIR/../chart"
-  dep_chart_dir="$chart_dir/charts"
+
+  # Helm chart directory path -- /scripts --> /chart (or /charts)
+  local dep_chart_dir="${HELM_CHART_DIR%/}/charts"
 
   # This performs a dependency update and then extracts the tarballs pulled.
   # If and when the `--untar` functionality is added to the `helm dependency
@@ -651,6 +654,7 @@ IMAGES=
 IMAGE_LOAD_TAR=
 # Images which require helm chart dependency update
 HELM_DEPS_IMAGES=${HELM_DEPS_IMAGES:-}
+HELM_CHART_DIR=${HELM_CHART_DIR:-}
 LOCAL_HELM=
 NIX_SOURCES=$(realpath "${NIX_SOURCES:-"$SCRIPT_DIR/../nix/sources.nix"}")
 DEFAULT_COMMON_BINS=("$CURL" "$DOCKER" "$TAR" "$RM" "$NIX_BUILD" "$ZCAT")
