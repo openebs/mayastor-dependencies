@@ -428,7 +428,8 @@ build_helm_deps() {
   echo "Updating helm chart dependencies ..."
 
   # Helm chart directory path -- /scripts --> /chart (or /charts)
-  local dep_chart_dir="${HELM_CHART_DIR%/}/charts"
+  local chart_dir=${HELM_CHART_DIR%/}
+  local dep_chart_dir="$chart_dir/charts"
 
   # This performs a dependency update and then extracts the tarballs pulled.
   # If and when the `--untar` functionality is added to the `helm dependency
