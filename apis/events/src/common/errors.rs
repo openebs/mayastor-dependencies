@@ -24,15 +24,15 @@ pub enum Error {
         error
     ))]
     ConsumerError { consumer: String, error: String },
-    /// Failed to get/create stream.
-    #[snafu(display(
-        "Jetstream Error while getting/creating stream '{}': {}",
-        stream,
-        source
-    ))]
-    StreamError {
+    #[snafu(display("Jetstream Error while creating stream '{stream}': {source}"))]
+    CreateStreamError {
         stream: String,
         source: async_nats::jetstream::context::CreateStreamError,
+    },
+    #[snafu(display("Jetstream Error while getting stream '{stream}': {source}"))]
+    GetStreamError {
+        stream: String,
+        source: async_nats::jetstream::context::GetStreamError,
     },
     /// Invalid event message id.
     #[snafu(display("Error while generating subject: {}", error_msg))]

@@ -31,8 +31,8 @@ pub type BusResult<T> = Result<T, Error>;
 
 /// Initialise the Nats Message Bus.
 pub async fn message_bus_init(server: &str, msg_replicas: Option<usize>) -> impl crate::Bus {
-    let bus = NatsMessageBus::new(server).await;
-    let _ = bus.get_or_create_stream(None, msg_replicas).await;
+    let bus = NatsMessageBus::new(server, msg_replicas).await;
+    let _ = bus.get_or_create_stream(None, None).await;
     bus
 }
 
@@ -41,6 +41,7 @@ pub async fn message_bus_init(server: &str, msg_replicas: Option<usize>) -> impl
 pub(crate) struct NatsMessageBus {
     client: Client,
     jetstream: Context,
+    replicas: usize,
 }
 
 impl NatsMessageBus {
@@ -88,7 +89,7 @@ impl NatsMessageBus {
     }
 
     /// Creates a new nats message bus connection.
-    pub async fn new(server: &str) -> Self {
+    pub async fn new(server: &str, replicas: Option<usize>) -> Self {
         let client = Self::connect(server).await;
         Self {
             client: client.clone(),
@@ -97,7 +98,12 @@ impl NatsMessageBus {
                 js.set_timeout(PUBLISH_TIMEOUT);
                 js
             },
+            replicas: replicas.unwrap_or(NUM_STREAM_REPLICAS),
         }
+    }
+
+    fn replicas(&self, replicas: Option<usize>) -> usize {
+        replicas.unwrap_or(self.replicas)
     }
 
     /// Creates consumer and returns an iterator for the messages on the stream.
@@ -117,7 +123,7 @@ impl NatsMessageBus {
         };
 
         loop {
-            let err = match stream
+            let error = match stream
                 .get_or_create_consumer(CONSUMER_NAME, consumer_config.clone())
                 .await
             {
@@ -141,12 +147,45 @@ impl NatsMessageBus {
             };
 
             if tries == options.max_retries {
-                return Err(err);
+                return Err(error);
             }
             if log_error {
-                tracing::warn!(%err,
-                    "Nats error while getting consumer '{}' messages. Retrying...",
-                    CONSUMER_NAME
+                tracing::warn!(%error,
+                    "Nats error while getting consumer '{CONSUMER_NAME}' messages. Retrying...",
+                );
+                log_error = false;
+            }
+            backoff_with_options(&mut tries, &options).await;
+        }
+    }
+
+    /// Gets a stream handle ([`Stream`]) if it exists on message bus.
+    /// Retries using default or specified [`BackoffOptions`].
+    pub async fn get_stream(&self, retry_options: Option<BackoffOptions>) -> BusResult<Stream> {
+        tracing::debug!("Getting stream '{STREAM_NAME}'");
+        let options = retry_options.unwrap_or_default();
+        let mut tries = 0;
+        let mut log_error = true;
+
+        loop {
+            let error = match self.jetstream.get_stream(STREAM_NAME).await {
+                Ok(stream) => {
+                    tracing::debug!("Getting stream '{STREAM_NAME}' successful");
+                    return Ok(stream);
+                }
+                Err(error) => error,
+            };
+
+            if tries == options.max_retries {
+                return Err(Error::GetStreamError {
+                    stream: STREAM_NAME.to_string(),
+                    source: error,
+                });
+            }
+            if log_error {
+                tracing::warn!(
+                    %error,
+                    "Error while getting stream '{STREAM_NAME}'. Retrying...",
                 );
                 log_error = false;
             }
@@ -160,7 +199,7 @@ impl NatsMessageBus {
         retry_options: Option<BackoffOptions>,
         msg_replicas: Option<usize>,
     ) -> BusResult<Stream> {
-        tracing::debug!("Getting/creating stream '{}'", STREAM_NAME);
+        tracing::debug!("Getting/creating stream '{STREAM_NAME}'");
         let options = retry_options.unwrap_or_default();
         let mut tries = 0;
         let mut log_error = true;
@@ -172,12 +211,12 @@ impl NatsMessageBus {
             storage: async_nats::jetstream::stream::StorageType::Memory, /* The type of storage
                                                                           * backend, `File`
                                                                           * (default) */
-            num_replicas: msg_replicas.unwrap_or(NUM_STREAM_REPLICAS),
+            num_replicas: self.replicas(msg_replicas),
             ..async_nats::jetstream::stream::Config::default()
         };
 
         loop {
-            let err = match self
+            let error = match self
                 .jetstream
                 .get_or_create_stream(stream_config.clone())
                 .await
@@ -190,15 +229,15 @@ impl NatsMessageBus {
             };
 
             if tries == options.max_retries {
-                return Err(Error::StreamError {
+                return Err(Error::CreateStreamError {
                     stream: STREAM_NAME.to_string(),
-                    source: err,
+                    source: error,
                 });
             }
             if log_error {
-                tracing::warn!(%err,
-                    "Error while getting/creating stream '{}'. Retrying...",
-                    STREAM_NAME
+                tracing::warn!(
+                    %error,
+                    "Error while getting/creating stream '{STREAM_NAME}'. Retrying...",
                 );
                 log_error = false;
             }
@@ -291,7 +330,7 @@ impl Bus for NatsMessageBus {
         &mut self,
     ) -> BusResult<BusSubscription<T>> {
         tracing::trace!("Subscribing to Nats message bus");
-        let stream = self.get_or_create_stream(None, None).await?;
+        let stream = self.get_stream(None).await?;
 
         let messages = self.create_consumer_and_get_messages(stream).await?;
         tracing::trace!("Subscribed to Nats message bus successfully");
