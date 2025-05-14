@@ -6,8 +6,12 @@ pub(crate) struct MbusPublisher {}
 
 impl MbusPublisher {
     /// Initializes mbus and runs the publisher.
-    pub async fn run(mbus_url: &str, recv: tokio::sync::mpsc::Receiver<EventMessage>) {
-        let mbus = message_bus_init(mbus_url, None).await;
+    pub async fn run(
+        mbus_url: &str,
+        recv: tokio::sync::mpsc::Receiver<EventMessage>,
+        replicas: Option<usize>,
+    ) {
+        let mbus = message_bus_init(mbus_url, replicas).await;
         Self::publish_events(mbus, recv).await;
     }
 

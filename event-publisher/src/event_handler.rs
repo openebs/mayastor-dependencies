@@ -9,12 +9,12 @@ pub struct EventHandle {}
 impl EventHandle {
     /// Initilize the buffer, starts the event publisher and return the layer for handling the event
     /// traces.
-    pub fn init(mbus_url: String, service_name: &str) -> EventLayer {
+    pub fn init(mbus_url: String, service_name: &str, replicas: Option<usize>) -> EventLayer {
         let (send, recv) = tokio::sync::mpsc::channel::<EventMessage>(MAX_BUFFER_MSGS);
         initialize_source_component(service_name);
         let layer = EventLayer::new(send);
         tokio::spawn(async move {
-            MbusPublisher::run(&mbus_url, recv).await;
+            MbusPublisher::run(&mbus_url, recv, replicas).await;
             // TODO handle the closed channel situation.
         });
         layer
@@ -22,7 +22,12 @@ impl EventHandle {
 
     /// Initilize the buffer, starts the event publisher on the spawner specified in the args and
     /// return the layer for handling the event traces.
-    pub fn init_ext<T>(mbus_url: String, service_name: &str, spawn_fn: T) -> EventLayer
+    pub fn init_ext<T>(
+        mbus_url: String,
+        service_name: &str,
+        spawn_fn: T,
+        replicas: Option<usize>,
+    ) -> EventLayer
     where
         T: Fn(std::pin::Pin<Box<dyn core::future::Future<Output = ()> + Send>>),
     {
@@ -30,7 +35,7 @@ impl EventHandle {
         initialize_source_component(service_name);
         let layer = EventLayer::new(send);
         let publisher_future = Box::pin(async move {
-            MbusPublisher::run(&mbus_url, recv).await;
+            MbusPublisher::run(&mbus_url, recv, replicas).await;
             // TODO handle the closed channel situation.
         });
 
