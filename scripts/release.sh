@@ -540,7 +540,7 @@ upload_images() {
       tar="${UPLOAD_TARS[$i]}"
 
       # Should this be an override instead?
-      if [ -n "$CI" ] && dockerhub_tag_exists "$img" "$TAG"; then
+      if [[ -n "$CI" && ! "$TAG" =~ -(develop|prerelease)$ ]] && dockerhub_tag_exists "$img" "$TAG"; then
         echo "Skipping $img:$TAG which already exists"
         continue
       fi
