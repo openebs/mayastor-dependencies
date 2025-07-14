@@ -431,15 +431,10 @@ build_helm_deps() {
   local chart_dir=${HELM_CHART_DIR%/}
   local dep_chart_dir="$chart_dir/charts"
 
-  # This performs a dependency update and then extracts the tarballs pulled.
-  # If and when the `--untar` functionality is added to the `helm dependency
-  # update command, the for block can be removed in favour of the `--untar` option.
-  # Ref: https://github.com/helm/helm/issues/8479
+  # Helm dependency update doesn't work correctly if a version of a dependency is newer than the required version
+  # This rm command clears out existing chart tarballs, so that helm dependency update works correctly.
+  rm -f "$dep_chart_dir"/*.tgz
   exec_helm "dependency update $chart_dir"
-  for dep_chart_tar in "$dep_chart_dir"/*.tgz; do
-    $TAR -xf "$dep_chart_tar" -C "$dep_chart_dir"
-    $RM -f "$dep_chart_tar"
-  done
 }
 
 build_images() {
