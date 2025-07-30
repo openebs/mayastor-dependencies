@@ -31,8 +31,7 @@ pub fn git_dir_cwd() -> std::io::Result<PathBuf> {
 	let output = strip_trailing_newline(output.stdout);
 
 	// Parse the output as UTF-8.
-	let path = std::str::from_utf8(&output)
-		.map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "invalid UTF-8 in path to .git directory"))?;
+	let path = std::str::from_utf8(&output).map_err(|_| std::io::Error::other("invalid UTF-8 in path to .git directory"))?;
 
 	Ok(PathBuf::from(path))
 }
@@ -61,15 +60,9 @@ where
 		// Include the first line of stderr in the error message, if it's valid UTF-8 and not empty.
 		let message = output.stderr.splitn(2, |c| *c == b'\n').next().unwrap();
 		if let Some(message) = String::from_utf8(message.to_vec()).ok().filter(|x| !x.is_empty()) {
-			Err(std::io::Error::new(
-				std::io::ErrorKind::Other,
-				format!("{command} failed with status {status}: {message}"),
-			))
+			Err(std::io::Error::other(format!("{command} failed with status {status}: {message}")))
 		} else {
-			Err(std::io::Error::new(
-				std::io::ErrorKind::Other,
-				format!("{command} failed with status {status}"),
-			))
+			Err(std::io::Error::other(format!("{command} failed with status {status}")))
 		}
 
 	// The command was killed by a signal.
@@ -79,10 +72,7 @@ where
 		{
 			use std::os::unix::process::ExitStatusExt;
 			let signal = output.status.signal().unwrap();
-			Err(std::io::Error::new(
-				std::io::ErrorKind::Other,
-				format!("{command} killed by signal {signal}"),
-			))
+			Err(std::io::Error::other(format!("{command} killed by signal {signal}")))
 		}
 		#[cfg(not(target_family = "unix"))]
 		{

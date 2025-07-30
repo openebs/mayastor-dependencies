@@ -124,9 +124,9 @@ impl MountInfo {
                         if let Some(b) = bytes.next() {
                             code *= 8;
                             code += u32::from_str_radix(&(b as char).to_string(), 8)
-                                .map_err(|err| Error::new(ErrorKind::Other, err))?;
+                                .map_err(Error::other)?;
                         } else {
-                            return Err(Error::new(ErrorKind::Other, "truncated octal code"));
+                            return Err(Error::other("truncated octal code"));
                         }
                     }
                     ret.push(code as u8);

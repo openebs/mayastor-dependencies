@@ -81,7 +81,7 @@ impl TryFrom<String> for TrType {
             "rdma" => Ok(TrType::rdma),
             "fc" => Ok(TrType::fc),
             "tcp" => Ok(TrType::tcp),
-            _ => Err(format!("Invalid TrType: {}", value)),
+            _ => Err(format!("Invalid TrType: {value}")),
         }
     }
 }

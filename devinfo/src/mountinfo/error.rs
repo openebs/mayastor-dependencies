@@ -31,7 +31,7 @@ impl Display for MountInfoError {
             ),
             Self::Nix(ref err) => write!(f, "{err}"),
             Self::ConvertOsStrToStr { source: src } => {
-                write!(f, "failed to convert {:?} to &str", src)
+                write!(f, "failed to convert {src:?} to &str")
             }
             Self::Semver(ref err) => write!(f, "semver error: {err}"),
         }

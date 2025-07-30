@@ -25,7 +25,7 @@ impl fmt::Display for Duration {
         } else if nanos % 1_000 == 0 {
             write!(f, ".{:06}s", nanos / 1_000)
         } else {
-            write!(f, ".{:09}s", nanos)
+            write!(f, ".{nanos:09}s")
         }
     }
 }

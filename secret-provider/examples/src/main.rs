@@ -44,14 +44,14 @@ async fn main() -> Result<(), Error> {
     let raw_secret: EncryptionParameters = k8s_provider
         .secret_data("example_secret_params.json")
         .await?;
-    println!("Encryption Parameters from file: {:?}", raw_secret);
+    println!("Encryption Parameters from file: {raw_secret:?}");
 
     let client = kube::Client::try_default()
         .await
         .expect("Should be able to create kube client");
     let k8s_provider = K8sSecretProvider::new(client, "default");
     let raw_secret: EncryptionParameters = k8s_provider.secret_data("my-secret").await?;
-    println!("Encryption Parameters from k8s: {:?}", raw_secret);
+    println!("Encryption Parameters from k8s: {raw_secret:?}");
 
     Ok(())
 }
