@@ -56,6 +56,9 @@ message CreatePoolRequest {
     EncryptionData data = 7;
     EncryptionSecret secret = 8;
   }
+  // The pool configuration specifying raid type and configuration if number of
+  // disks exceeds 1.
+  optional RaidConfig raid_config = 9;
 }
 
 // Pool metadata arguments.
@@ -88,6 +91,22 @@ message ImportPoolRequest {
     EncryptionData data = 5;
     EncryptionSecret secret = 6;
   }
+  // The pool configuration specifying raid type and configuration if number of
+  // disks exceeds 1.
+  optional RaidConfig raid_config = 7;
+}
+
+// Pool raid configuration
+message RaidConfig {
+  oneof config {
+    Raid0Config raid0 = 1;
+  }
+}
+
+// RAID0 configuration parameters
+message Raid0Config {
+  // Strip size in KB (default 64)
+  uint32 strip_size_kb = 1;
 }
 
 // State of the storage pool (terminology comes from ZFS).
@@ -133,6 +152,8 @@ message Pool {
   optional bool encrypted = 13;
   // Maximum capacity upto which this pool can be expanded, in bytes.
   optional uint64 max_expandable_size = 14;
+  // Optional RAID information if the pool is configured to use a RAID setup.
+  optional RaidInfo raid_info = 15;
 }
 
 // Pool metadata info.
@@ -150,6 +171,14 @@ message PoolMetadataInfo {
   // existing replicas.
   // If the pool backend does not support metadata capacity evaluation, zero is returned.
   uint64 md_used_pages = 3;
+}
+
+// Pool RAID information.
+message RaidInfo {
+  // RAID level (e.g., "raid0", "raid1", "raid5").
+  string level = 1;
+  // RAID state (e.g., "online", "configuring", "offline").
+  string state = 2;
 }
 
 // Destroy pool arguments.

@@ -40,9 +40,10 @@ pub mod pool {
     pub use super::pb::{
         pool_rpc_client::PoolRpcClient,
         pool_rpc_server::{PoolRpc, PoolRpcServer},
-        CreatePoolRequest, DestroyPoolRequest, ExportPoolRequest, GrowPoolRequest,
+        raid_config, CreatePoolRequest, DestroyPoolRequest, ExportPoolRequest, GrowPoolRequest,
         GrowPoolResponse, ImportPoolRequest, ListPoolOptions, ListPoolsResponse, Pool,
-        PoolMetadataArgs, PoolMetadataInfo, PoolState, PoolType, PoolTypeValue,
+        PoolMetadataArgs, PoolMetadataInfo, PoolState, PoolType, PoolTypeValue, Raid0Config,
+        RaidConfig, RaidInfo,
     };
 }
 
