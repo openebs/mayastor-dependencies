@@ -18,6 +18,7 @@ service PoolRpc {
   rpc ImportPool (ImportPoolRequest) returns (Pool) {}
   rpc ListPools (ListPoolOptions) returns (ListPoolsResponse) {}
   rpc GrowPool (GrowPoolRequest) returns (GrowPoolResponse) {}
+  rpc GrowPoolV2 (GrowPoolRequest) returns (Pool) {}
 }
 
 // Specifies the type of the pool
@@ -59,23 +60,20 @@ message CreatePoolRequest {
 
 // Pool metadata arguments.
 message PoolMetadataArgs {
-  // This parameter controls the initial metadata reservation for a storage pool.
-  // This parameter sets a ratio of the desired metadata reservation amount
-  // to the default reservation for the given pool type.
+  // Deprecated after the addition of max_expansion.
+  optional float md_resv_ratio = 1;
+  // This defines how much a Pool can grow upto.
+  // Reserves metadata during pool creation to support required growth.
+  // There are 2 ways in which this can be set.
   //
-  // 1.0 is the default value, and it means to reserve the amount
-  // of disk space for metadata which is default for the pool type.
+  // 1. Using factor
+  // 1x will allow limited growth. pool cannot grow upto 2x the original size.
+  // 5x will allow the pool to be grown 5 times the initial size.
   //
-  // Values larger that 1.0 would increase amount of space reserved for metadata.
-  // For example, 2.0 would double the capacity reserved for metadata.
+  // 2. Absolute size
+  // User can pass Absolute size. For example, 800GiB, 3.5TiB or 4563726394B.
   //
-  // Values smaller that 1.0 would decrease amount of space reserved for metadata.
-  // For example, 0.5 would half the capacity reserved for metadata.
-  //
-  // The actual amount of disk space in bytes reserved for metadata may
-  // depend on pool size, cluster size, and other pool parameters.
-  // A pool backend may also allow dynamic metadata allocation.
-   optional float md_resv_ratio = 1;
+  optional string max_expansion = 2;
 }
 
 // Create pool arguments.
@@ -133,9 +131,11 @@ message Pool {
   optional PoolMetadataInfo md_info = 12;
   // Is the pool encrypted.
   optional bool encrypted = 13;
+  // Maximum capacity upto which this pool can be expanded, in bytes.
+  optional uint64 max_expandable_size = 14;
 }
 
-// Pool medata info.
+// Pool metadata info.
 message PoolMetadataInfo {
   // Size of metadata allocation page in bytes.
   uint32 md_page_size = 1;
