@@ -1400,6 +1400,7 @@ impl ComposeTest {
                 "SYS_ADMIN".to_string(),
                 "IPC_LOCK".into(),
                 "SYS_NICE".into(),
+                "SYS_RESOURCE".into(),
             ]),
             privileged: spec.privileged(),
             security_opt: Some(vec!["seccomp=unconfined".into()]),
