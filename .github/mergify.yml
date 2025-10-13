@@ -17,3 +17,4 @@ pull_request_rules:
       review:
         type: APPROVE
         message: "Automatically approved backport PR"
+        bot_account: openebs-ci
