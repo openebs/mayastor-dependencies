@@ -8,8 +8,8 @@ merge_queue:
 pull_request_rules:
   - name: auto-label and approve backport PRs
     conditions:
-      - author=Mergify
-      - title~=\(backport #[0-9]+\)$
+      - author=mergify[bot]
+      - title~=\(backport \#[0-9]+\)$
     actions:
       label:
         add:
