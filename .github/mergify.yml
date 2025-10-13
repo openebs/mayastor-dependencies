@@ -9,7 +9,7 @@ pull_request_rules:
   - name: auto-label and approve backport PRs
     conditions:
       - author=Mergify
-      - title~=\(Backport #[0-9]+\)$
+      - title~=\(backport #[0-9]+\)$
     actions:
       label:
         add:
