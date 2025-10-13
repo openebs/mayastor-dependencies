@@ -5,6 +5,11 @@ let
     overlays = [ (_: _: { inherit sources; }) (import ./nix/overlay.nix { }) ];
   };
   rust = import sources.nixpkgs { overlays = [ (import sources.rust-overlay) ]; };
+  usePreCommit = builtins.getEnv "IN_NIX_SHELL" == "impure" && builtins.getEnv "CI" != "1";
+  pre-commit = pkgs.runCommand "pre-commit" { } ''
+    mkdir -p $out/bin
+    cp ${pkgs.pre-commit}/bin/pre-commit $out/bin/pre-commit
+  '';
 in
 let
   rust-bin =
@@ -21,20 +26,19 @@ pkgs.mkShell {
     clang
     openssl
     pkg-config
-    pre-commit
     protobuf
     udev
     util-linux
     commitlint
     git
-  ];
+  ] ++ pkgs.lib.optional (usePreCommit) pre-commit;
 
   LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
   PROTOC = "${protobuf}/bin/protoc";
   PROTOC_INCLUDE = "${protobuf}/include";
 
   shellHook = ''
-    if [ -z "$CI" ] && [ "$IN_NIX_SHELL" = "impure" ]; then
+    if [ "${toString usePreCommit}" = "1" ]; then
       pre-commit install
       pre-commit install --hook commit-msg
     fi
