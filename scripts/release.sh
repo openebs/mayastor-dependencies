@@ -279,6 +279,10 @@ parse_common_arg() {
       SKIP_CARGO_DEPS="yes"
       shift
       ;;
+    --helm-update)
+      HELM_DEP_UPDATE="true"
+      shift
+      ;;
     *)
       echo "Unknown option: $1"
       exit 1
@@ -383,27 +387,152 @@ helm_check() {
     return
   fi
   # todo: need to check for specific version?
-  if binary_check "$HELM" "version"; then
-    LOCAL_HELM="y"
-  else
-    if [ ! -f "$NIX_SOURCES" ]; then
-      die "$(binary_missing_msg "$HELM") or set NIX_SOURCES so we can pull it from nixpkgs"
-    fi
-    NIX_SOURCES=$(realpath "$NIX_SOURCES")
-    binary_check_die "$NIX_SHELL"
-    if ! exec_helm "version" &>/dev/null; then
-      binary_check_die "$HELM"
-    fi
+  if ! binary_check "$HELM" "version"; then
+    HELM=$(fetch_nix_bin "kubernetes-helm-wrapped" "helm")
   fi
   binary_check_die "$TAR"
+  if ! binary_check "$SEMVER"; then
+    SEMVER=$(fetch_nix_bin "semver-tool" "semver")
+  fi
+  if ! binary_check "$YQ"; then
+    YQ=$(fetch_nix_bin "yq-go" "yq")
+  fi
 }
 
-# Execute helm commands, either using local binary (if present) or nix-shell
-exec_helm() {
-  if [ -n "$LOCAL_HELM" ]; then
-    $HELM $@
+fetch_nix_bin() {
+  local package="$1"
+  local bin="$2"
+
+  if [ ! -f "$NIX_SOURCES" ]; then
+    die "$(binary_missing_msg "$HELM") or set NIX_SOURCES so we can pull it from nixpkgs"
+  fi
+  NIX_SOURCES=$(realpath "$NIX_SOURCES")
+  binary_check_die "$NIX"
+
+  $NIX shell --impure $(nix_experimental) --expr "(import (import $NIX_SOURCES).nixpkgs {}).$package" -c which $bin
+}
+
+helm_dep_update_required() {
+  local chart="$1"
+
+  repository=$(echo "$chart" | jq -r '.repository')
+  version=$(echo "$chart" | jq -r '.version')
+  name=$(echo "$chart" | jq -r '.name')
+  tar=$(echo "$chart" | jq -r '.tar')
+
+  if [ "$($SEMVER validate "$version")" != "valid" ]; then
+    die "Found $name with version $version only pinned versions are supported!"
+  fi
+
+  if [ -z "$repository" ]; then
+    echo "false"
+    return 0
+  fi
+
+  # Special case for our floating charts
+  if [[ "$($SEMVER get prerel "$version")" =~ (develop|prerelease) ]]; then
+    echo "true"
+    return 0
+  fi
+
+  if ! [ -f "$tar" ]; then
+    echo "true"
   else
-    $NIX_SHELL -p "(import (import $NIX_SOURCES).nixpkgs {}).kubernetes-helm-wrapped" --run "$HELM $@"
+    echo "false"
+  fi
+}
+
+# Returns the json for the helm chart dependencies
+# In case of dependents of other local charts, an additional parent is added to the json
+helm_all_deps() {
+  local chart_dir="$1"
+  local chart_rel="${2:-}"
+  if [ -n "$chart_rel" ]; then
+    chart_dir="$chart_dir/$chart_rel"
+  fi
+  local all_deps deps
+
+  if ! deps=$($HELM show chart "$chart_dir" --kubeconfig "$chart_dir/fake" | $YQ -o=json ".dependencies[]" | jq -c); then
+    die "Can't find the helm dependencies in $chart_dir"
+  fi
+
+  for chart in ${deps[@]}; do
+    repository=$(echo "$chart" | jq -r '.repository')
+    name=$(echo "$chart" | jq -r '.name')
+    version=$(echo "$chart" | jq -r '.version')
+
+    local name_rel="charts/$name"
+    if [ -n "${repository:-}" ]; then
+      local chart_tar="$chart_dir/$name_rel-$version.tgz"
+      chart=$(echo "$chart" | jq -c ".tar = \"$chart_tar\"")
+
+      if [ -n "$chart_rel" ]; then
+        local chart_loc="$chart_dir"
+        chart=$(echo "$chart" | jq -c ".chart = \"$chart_loc\"")
+      fi
+
+      if [ -n "${all_deps:-}" ]; then
+        all_deps="$all_deps
+        $chart"
+      else
+        all_deps="$chart"
+      fi
+      continue
+    fi
+
+    if [ -n "$chart_rel" ]; then
+      name_rel="$chart_rel/$name_rel"
+    fi
+    # if there's no repository, it's a local chart, so check its own dependencies
+    deps=$(helm_all_deps "$chart_dir" "$name_rel")
+    if [ -n "${all_deps:-}" ]; then
+      all_deps="$all_deps
+      $deps"
+    else
+      all_deps="$deps"
+    fi
+  done
+
+  echo "${all_deps:-}"
+}
+
+# This fetches the dependencies in an exact version from the Chart.yaml
+# NOTE: Auto dependency update only works for non-pinned versions, ex: not for 14 but for 14.0.0
+# NOTE: Also floating versions such as -develop and -prerelease need to be force updated
+# Update can be forced with global var HELM_DEP_UPDATE="true" or cli --helm-update
+helm_dep_update() {
+  local chart_dir="$1"
+  local update="false"
+  local deps chart_loc
+
+  deps=$(helm_all_deps "$chart_dir")
+
+  # no dependencies?
+  if [ -z "${deps:-}" ]; then
+    return 0
+  fi
+
+  if [ "$HELM_DEP_UPDATE" = "true" ]; then
+    update="true"
+  else
+    while read -r chart; do
+      update_required=$(helm_dep_update_required "$chart")
+      if [ "$update_required" = "true" ]; then
+        update="true"
+        break
+      fi
+    done <<< "$deps"
+  fi
+
+  if [ "$update" = "true" ]; then
+    echo "Updating helm chart dependencies ..."
+    $HELM dependency update "$chart_dir" --kubeconfig "$chart_dir/fake"
+    while read -r chart; do
+      chart_loc=$(echo "$chart" | jq -r '.chart')
+      if [ -n "$chart_loc" ] && [ "$chart_loc" != "null" ]; then
+        $HELM dependency update "$chart_loc" --kubeconfig "$chart_dir/fake"
+      fi
+    done <<< "$deps"
   fi
 }
 
@@ -425,21 +554,7 @@ build_helm_deps() {
     die "Some of the images require `helm dependency update` on the helm chart, but the chart directory is not set"
   fi
 
-  echo "Updating helm chart dependencies ..."
-
-  # Helm chart directory path -- /scripts --> /chart (or /charts)
-  local chart_dir=${HELM_CHART_DIR%/}
-  local dep_chart_dir="$chart_dir/charts"
-
-  # This performs a dependency update and then extracts the tarballs pulled.
-  # If and when the `--untar` functionality is added to the `helm dependency
-  # update command, the for block can be removed in favour of the `--untar` option.
-  # Ref: https://github.com/helm/helm/issues/8479
-  exec_helm "dependency update $chart_dir"
-  for dep_chart_tar in "$dep_chart_dir"/*.tgz; do
-    $TAR -xf "$dep_chart_tar" -C "$dep_chart_dir"
-    $RM -f "$dep_chart_tar"
-  done
+  helm_dep_update "${HELM_CHART_DIR%/}"
 }
 
 build_images() {
@@ -608,6 +723,7 @@ common_help() {
   --build-binary-out <path>  Specify the outlink path for the binaries (otherwise it's the current directory).
   --skopeo-copy              Don't load containers into host, simply copy them to registry with skopeo.
   --skip-cargo-deps          Don't prefetch the cargo build dependencies.
+  --helm-update              Force update helm dependencies.
 
 Environment Variables:
   RUSTFLAGS                  Set Rust compiler options when building binaries.
@@ -617,7 +733,8 @@ EOF
 CI=${CI-}
 DOCKER=$(docker_alias)
 NIX_BUILD="nix-build"
-NIX_EVAL="nix eval$(nix_experimental)"
+NIX="nix"
+NIX_EVAL="$NIX eval$(nix_experimental)"
 NIX_SHELL="nix-shell"
 RM="rm"
 TAR="tar"
@@ -625,6 +742,8 @@ HELM="helm"
 CURL="curl"
 SKOPEO="skopeo"
 ZCAT="zcat"
+SEMVER="semver"
+YQ="yq"
 SCRIPT_DIR=$(dirname "$0")
 TAG=$(get_tag)
 HASH=$(get_hash)
@@ -662,6 +781,8 @@ DEFAULT_COMMON_BINS=("$CURL" "$DOCKER" "$TAR" "$RM" "$NIX_BUILD" "$ZCAT")
 COMMON_BINS=${COMMON_BINS:-"${DEFAULT_COMMON_BINS[@]}"}
 CONTAINER_LOAD="yes"
 LOCAL_SKOPEO=
+# Force helm dependency update
+HELM_DEP_UPDATE=${HELM_DEP_UPDATE:-"false"}
 
 binaries_check "${COMMON_BINS[@]}"
 helm_check
