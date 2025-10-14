@@ -24,20 +24,12 @@
 #
 #common_run $@
 
-# Write output to error output stream.
-echo_stderr() {
-  echo -e "${1}" >&2
-}
-
-# Write out error and exit process with specified error or 1.
-die()
-{
-  local _return="${2:-1}"
-  echo_stderr "$1"
-  exit "${_return}"
-}
-
 set -euo pipefail
+
+SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]:-"$0"}")")"
+
+source "$SCRIPT_DIR/utils/log.sh"
+source "$SCRIPT_DIR/utils/helm.sh"
 
 # Test if the image already exists in the image registry
 dockerhub_tag_exists() {
@@ -97,7 +89,7 @@ pre_fetch_cargo_deps() {
     return 0
   fi
 
-  die "Failed to pre-fetch the cargo vendored dependencies in $maxAttempt attempts"
+  log_fatal "Failed to pre-fetch the cargo vendored dependencies in $maxAttempt attempts"
 }
 # Setup DOCKER with the docker or podman (which is mostly cli compat with docker and thus
 # we can simply use it as an alias) cli.
@@ -144,7 +136,7 @@ binary_check_die() {
 }
 # Bail out with binary missing (arg 1) error
 binary_missing_die() {
-  die "$(binary_missing_msg "$1")"
+  log_fatal "$(binary_missing_msg "$1")"
 }
 # Get the binary missing error message
 binary_missing_msg() {
@@ -172,7 +164,7 @@ parse_common_args() {
 # Validates that argument does not start with "-"
 validate_arg() {
   if [[ "${2:--}" =~ ^-.* ]]; then
-    die "Missing $1 argument"
+    log_fatal "Missing $1 argument"
   fi
 }
 
@@ -294,7 +286,7 @@ parse_common_arg() {
 # Setup various build variables
 setup() {
   if [ -n "$SKIP_BUILD" ] && [ -z "$CONTAINER_LOAD" ]; then
-    die "--skopeo-copy currently incompatible with --skip-build"
+    log_fatal "--skopeo-copy currently incompatible with --skip-build"
   fi
 
   if [ -z "$IMAGES" ]; then
@@ -346,19 +338,10 @@ cache_deps() {
     return
   fi
   if [ -z "${PROJECT:-}" ]; then
-    die "Caching cargo deps requires \$PROJECT env to be set"
+    log_fatal "Caching cargo deps requires \$PROJECT env to be set"
   fi
   ## pre-fetch build dependencies with a number of attempts to harden against flaky networks
   pre_fetch_cargo_deps "$CARGO_DEPS" "mayastor-$PROJECT" "$CARGO_VENDOR_ATTEMPTS"
-}
-
-# Execute skopeo commands, either using local binary (if present) or nix-shell
-exec_skopeo() {
-  if [ -n "$LOCAL_SKOPEO" ]; then
-    $SKOPEO $@
-  else
-    $NIX_SHELL -p "(import (import $NIX_SOURCES).nixpkgs {}).skopeo" --run "$SKOPEO $@"
-  fi
 }
 
 skopeo_check() {
@@ -366,18 +349,8 @@ skopeo_check() {
   if [ -n "$CONTAINER_LOAD" ]; then
     return
   fi
-
-  if binary_check "$SKOPEO"; then
-    LOCAL_SKOPEO="y"
-  else
-    if [ ! -f "$NIX_SOURCES" ]; then
-      die "$(binary_missing_msg "$SKOPEO") or set NIX_SOURCES so we can pull it from nixpkgs"
-    fi
-    NIX_SOURCES=$(realpath "$NIX_SOURCES")
-    binary_check_die "$NIX_SHELL"
-    if ! exec_skopeo "--version" &>/dev/null; then
-      binary_check_die "$SKOPEO"
-    fi
+  if ! binary_check "$SKOPEO"; then
+    SKOPEO=$(fetch_nix_bin "skopeo" "skopeo")
   fi
 }
 
@@ -404,136 +377,12 @@ fetch_nix_bin() {
   local bin="$2"
 
   if [ ! -f "$NIX_SOURCES" ]; then
-    die "$(binary_missing_msg "$HELM") or set NIX_SOURCES so we can pull it from nixpkgs"
+    log_fatal "$(binary_missing_msg "$HELM") or set NIX_SOURCES so we can pull it from nixpkgs"
   fi
   NIX_SOURCES=$(realpath "$NIX_SOURCES")
   binary_check_die "$NIX"
 
   $NIX shell --impure $(nix_experimental) --expr "(import (import $NIX_SOURCES).nixpkgs {}).$package" -c which $bin
-}
-
-helm_dep_update_required() {
-  local chart="$1"
-
-  repository=$(echo "$chart" | jq -r '.repository')
-  version=$(echo "$chart" | jq -r '.version')
-  name=$(echo "$chart" | jq -r '.name')
-  tar=$(echo "$chart" | jq -r '.tar')
-
-  if [ "$($SEMVER validate "$version")" != "valid" ]; then
-    die "Found $name with version $version only pinned versions are supported!"
-  fi
-
-  if [ -z "$repository" ]; then
-    echo "false"
-    return 0
-  fi
-
-  # Special case for our floating charts
-  if [[ "$($SEMVER get prerel "$version")" =~ (develop|prerelease) ]]; then
-    echo "true"
-    return 0
-  fi
-
-  if ! [ -f "$tar" ]; then
-    echo "true"
-  else
-    echo "false"
-  fi
-}
-
-# Returns the json for the helm chart dependencies
-# In case of dependents of other local charts, an additional parent is added to the json
-helm_all_deps() {
-  local chart_dir="$1"
-  local chart_rel="${2:-}"
-  if [ -n "$chart_rel" ]; then
-    chart_dir="$chart_dir/$chart_rel"
-  fi
-  local all_deps deps
-
-  if ! deps=$($HELM show chart "$chart_dir" --kubeconfig "$chart_dir/fake" | $YQ -o=json ".dependencies[]" | jq -c); then
-    die "Can't find the helm dependencies in $chart_dir"
-  fi
-
-  for chart in ${deps[@]}; do
-    repository=$(echo "$chart" | jq -r '.repository')
-    name=$(echo "$chart" | jq -r '.name')
-    version=$(echo "$chart" | jq -r '.version')
-
-    local name_rel="charts/$name"
-    if [ -n "${repository:-}" ]; then
-      local chart_tar="$chart_dir/$name_rel-$version.tgz"
-      chart=$(echo "$chart" | jq -c ".tar = \"$chart_tar\"")
-
-      if [ -n "$chart_rel" ]; then
-        local chart_loc="$chart_dir"
-        chart=$(echo "$chart" | jq -c ".chart = \"$chart_loc\"")
-      fi
-
-      if [ -n "${all_deps:-}" ]; then
-        all_deps="$all_deps
-        $chart"
-      else
-        all_deps="$chart"
-      fi
-      continue
-    fi
-
-    if [ -n "$chart_rel" ]; then
-      name_rel="$chart_rel/$name_rel"
-    fi
-    # if there's no repository, it's a local chart, so check its own dependencies
-    deps=$(helm_all_deps "$chart_dir" "$name_rel")
-    if [ -n "${all_deps:-}" ]; then
-      all_deps="$all_deps
-      $deps"
-    else
-      all_deps="$deps"
-    fi
-  done
-
-  echo "${all_deps:-}"
-}
-
-# This fetches the dependencies in an exact version from the Chart.yaml
-# NOTE: Auto dependency update only works for non-pinned versions, ex: not for 14 but for 14.0.0
-# NOTE: Also floating versions such as -develop and -prerelease need to be force updated
-# Update can be forced with global var HELM_DEP_UPDATE="true" or cli --helm-update
-helm_dep_update() {
-  local chart_dir="$1"
-  local update="false"
-  local deps chart_loc
-
-  deps=$(helm_all_deps "$chart_dir")
-
-  # no dependencies?
-  if [ -z "${deps:-}" ]; then
-    return 0
-  fi
-
-  if [ "$HELM_DEP_UPDATE" = "true" ]; then
-    update="true"
-  else
-    while read -r chart; do
-      update_required=$(helm_dep_update_required "$chart")
-      if [ "$update_required" = "true" ]; then
-        update="true"
-        break
-      fi
-    done <<< "$deps"
-  fi
-
-  if [ "$update" = "true" ]; then
-    echo "Updating helm chart dependencies ..."
-    $HELM dependency update "$chart_dir" --kubeconfig "$chart_dir/fake"
-    while read -r chart; do
-      chart_loc=$(echo "$chart" | jq -r '.chart')
-      if [ -n "$chart_loc" ] && [ "$chart_loc" != "null" ]; then
-        $HELM dependency update "$chart_loc" --kubeconfig "$chart_dir/fake"
-      fi
-    done <<< "$deps"
-  fi
 }
 
 build_helm_deps() {
@@ -551,7 +400,7 @@ build_helm_deps() {
     return
   fi
   if [ -z "$HELM_CHART_DIR" ]; then
-    die "Some of the images require `helm dependency update` on the helm chart, but the chart directory is not set"
+    log_fatal "Some of the images require `helm dependency update` on the helm chart, but the chart directory is not set"
   fi
 
   helm_dep_update "${HELM_CHART_DIR%/}"
@@ -599,7 +448,7 @@ container_load() {
     if ! $DOCKER load -i "$1"; then
       if $DOCKER "version" | grep -i "podman" &>/dev/null; then
         IMAGE_LOAD_TAR="yes"
-        echo_stderr "Failed to load compressed docker image on podman, trying uncompressed image..."
+        log_warn "Failed to load compressed docker image on podman, trying uncompressed image..."
         container_load_tar "$1"
       else
         return 1
@@ -637,16 +486,16 @@ upload_image() {
     $DOCKER push "$img:$tag"
   elif [ -n "$tar" ]; then
     echo "Uploading $img:$tag to registry ..."
-    exec_skopeo copy docker-archive:"$tar" docker://"$img:$tag"
+    $SKOPEO copy docker-archive:"$tar" docker://"$img:$tag"
   else
-    die "Missing tar file... can't upload image"
+    log_fatal "Missing tar file... can't upload image"
   fi
 }
 
 upload_images() {
   # sanity check both arrays, just in case...
   if [ "${#UPLOAD_NAMES[*]}" != "${#UPLOAD_TARS[*]}" ]; then
-    die "Upload image names array doesn't match the image tar archives"
+    log_fatal "Upload image names array doesn't match the image tar archives"
   fi
 
   if (( ${#UPLOAD_NAMES[*]} )) && [ -z "$SKIP_PUBLISH" ]; then
@@ -777,7 +626,7 @@ HELM_DEPS_IMAGES=${HELM_DEPS_IMAGES:-}
 HELM_CHART_DIR=${HELM_CHART_DIR:-}
 LOCAL_HELM=
 NIX_SOURCES=$(realpath "${NIX_SOURCES:-"$SCRIPT_DIR/../nix/sources.nix"}")
-DEFAULT_COMMON_BINS=("$CURL" "$DOCKER" "$TAR" "$RM" "$NIX_BUILD" "$ZCAT")
+DEFAULT_COMMON_BINS=("$CURL" "$DOCKER" "$TAR" "$RM" "$NIX_BUILD" "$ZCAT" "$NIX")
 COMMON_BINS=${COMMON_BINS:-"${DEFAULT_COMMON_BINS[@]}"}
 CONTAINER_LOAD="yes"
 LOCAL_SKOPEO=
