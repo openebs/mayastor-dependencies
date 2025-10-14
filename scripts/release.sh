@@ -24,20 +24,12 @@
 #
 #common_run $@
 
-# Write output to error output stream.
-echo_stderr() {
-  echo -e "${1}" >&2
-}
-
-# Write out error and exit process with specified error or 1.
-die()
-{
-  local _return="${2:-1}"
-  echo_stderr "$1"
-  exit "${_return}"
-}
-
 set -euo pipefail
+
+SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]:-"$0"}")")"
+
+source "$SCRIPT_DIR/utils/log.sh"
+source "$SCRIPT_DIR/utils/helm.sh"
 
 # Test if the image already exists in the image registry
 dockerhub_tag_exists() {
@@ -97,7 +89,7 @@ pre_fetch_cargo_deps() {
     return 0
   fi
 
-  die "Failed to pre-fetch the cargo vendored dependencies in $maxAttempt attempts"
+  log_fatal "Failed to pre-fetch the cargo vendored dependencies in $maxAttempt attempts"
 }
 # Setup DOCKER with the docker or podman (which is mostly cli compat with docker and thus
 # we can simply use it as an alias) cli.
@@ -144,7 +136,7 @@ binary_check_die() {
 }
 # Bail out with binary missing (arg 1) error
 binary_missing_die() {
-  die "$(binary_missing_msg "$1")"
+  log_fatal "$(binary_missing_msg "$1")"
 }
 # Get the binary missing error message
 binary_missing_msg() {
@@ -172,7 +164,7 @@ parse_common_args() {
 # Validates that argument does not start with "-"
 validate_arg() {
   if [[ "${2:--}" =~ ^-.* ]]; then
-    die "Missing $1 argument"
+    log_fatal "Missing $1 argument"
   fi
 }
 
@@ -279,6 +271,10 @@ parse_common_arg() {
       SKIP_CARGO_DEPS="yes"
       shift
       ;;
+    --helm-update)
+      HELM_DEP_UPDATE="true"
+      shift
+      ;;
     *)
       echo "Unknown option: $1"
       exit 1
@@ -290,7 +286,7 @@ parse_common_arg() {
 # Setup various build variables
 setup() {
   if [ -n "$SKIP_BUILD" ] && [ -z "$CONTAINER_LOAD" ]; then
-    die "--skopeo-copy currently incompatible with --skip-build"
+    log_fatal "--skopeo-copy currently incompatible with --skip-build"
   fi
 
   if [ -z "$IMAGES" ]; then
@@ -342,19 +338,10 @@ cache_deps() {
     return
   fi
   if [ -z "${PROJECT:-}" ]; then
-    die "Caching cargo deps requires \$PROJECT env to be set"
+    log_fatal "Caching cargo deps requires \$PROJECT env to be set"
   fi
   ## pre-fetch build dependencies with a number of attempts to harden against flaky networks
   pre_fetch_cargo_deps "$CARGO_DEPS" "mayastor-$PROJECT" "$CARGO_VENDOR_ATTEMPTS"
-}
-
-# Execute skopeo commands, either using local binary (if present) or nix-shell
-exec_skopeo() {
-  if [ -n "$LOCAL_SKOPEO" ]; then
-    $SKOPEO $@
-  else
-    $NIX_SHELL -p "(import (import $NIX_SOURCES).nixpkgs {}).skopeo" --run "$SKOPEO $@"
-  fi
 }
 
 skopeo_check() {
@@ -362,18 +349,8 @@ skopeo_check() {
   if [ -n "$CONTAINER_LOAD" ]; then
     return
   fi
-
-  if binary_check "$SKOPEO"; then
-    LOCAL_SKOPEO="y"
-  else
-    if [ ! -f "$NIX_SOURCES" ]; then
-      die "$(binary_missing_msg "$SKOPEO") or set NIX_SOURCES so we can pull it from nixpkgs"
-    fi
-    NIX_SOURCES=$(realpath "$NIX_SOURCES")
-    binary_check_die "$NIX_SHELL"
-    if ! exec_skopeo "--version" &>/dev/null; then
-      binary_check_die "$SKOPEO"
-    fi
+  if ! binary_check "$SKOPEO"; then
+    SKOPEO=$(fetch_nix_bin "skopeo" "skopeo")
   fi
 }
 
@@ -383,28 +360,29 @@ helm_check() {
     return
   fi
   # todo: need to check for specific version?
-  if binary_check "$HELM" "version"; then
-    LOCAL_HELM="y"
-  else
-    if [ ! -f "$NIX_SOURCES" ]; then
-      die "$(binary_missing_msg "$HELM") or set NIX_SOURCES so we can pull it from nixpkgs"
-    fi
-    NIX_SOURCES=$(realpath "$NIX_SOURCES")
-    binary_check_die "$NIX_SHELL"
-    if ! exec_helm "version" &>/dev/null; then
-      binary_check_die "$HELM"
-    fi
+  if ! binary_check "$HELM" "version"; then
+    HELM=$(fetch_nix_bin "kubernetes-helm-wrapped" "helm")
   fi
   binary_check_die "$TAR"
+  if ! binary_check "$SEMVER"; then
+    SEMVER=$(fetch_nix_bin "semver-tool" "semver")
+  fi
+  if ! binary_check "$YQ"; then
+    YQ=$(fetch_nix_bin "yq-go" "yq")
+  fi
 }
 
-# Execute helm commands, either using local binary (if present) or nix-shell
-exec_helm() {
-  if [ -n "$LOCAL_HELM" ]; then
-    $HELM $@
-  else
-    $NIX_SHELL -p "(import (import $NIX_SOURCES).nixpkgs {}).kubernetes-helm-wrapped" --run "$HELM $@"
+fetch_nix_bin() {
+  local package="$1"
+  local bin="$2"
+
+  if [ ! -f "$NIX_SOURCES" ]; then
+    log_fatal "$(binary_missing_msg "$HELM") or set NIX_SOURCES so we can pull it from nixpkgs"
   fi
+  NIX_SOURCES=$(realpath "$NIX_SOURCES")
+  binary_check_die "$NIX"
+
+  $NIX shell --impure $(nix_experimental) --expr "(import (import $NIX_SOURCES).nixpkgs {}).$package" -c which $bin
 }
 
 build_helm_deps() {
@@ -422,24 +400,10 @@ build_helm_deps() {
     return
   fi
   if [ -z "$HELM_CHART_DIR" ]; then
-    die "Some of the images require `helm dependency update` on the helm chart, but the chart directory is not set"
+    log_fatal "Some of the images require `helm dependency update` on the helm chart, but the chart directory is not set"
   fi
 
-  echo "Updating helm chart dependencies ..."
-
-  # Helm chart directory path -- /scripts --> /chart (or /charts)
-  local chart_dir=${HELM_CHART_DIR%/}
-  local dep_chart_dir="$chart_dir/charts"
-
-  # This performs a dependency update and then extracts the tarballs pulled.
-  # If and when the `--untar` functionality is added to the `helm dependency
-  # update command, the for block can be removed in favour of the `--untar` option.
-  # Ref: https://github.com/helm/helm/issues/8479
-  exec_helm "dependency update $chart_dir"
-  for dep_chart_tar in "$dep_chart_dir"/*.tgz; do
-    $TAR -xf "$dep_chart_tar" -C "$dep_chart_dir"
-    $RM -f "$dep_chart_tar"
-  done
+  helm_dep_update "${HELM_CHART_DIR%/}"
 }
 
 build_images() {
@@ -484,7 +448,7 @@ container_load() {
     if ! $DOCKER load -i "$1"; then
       if $DOCKER "version" | grep -i "podman" &>/dev/null; then
         IMAGE_LOAD_TAR="yes"
-        echo_stderr "Failed to load compressed docker image on podman, trying uncompressed image..."
+        log_warn "Failed to load compressed docker image on podman, trying uncompressed image..."
         container_load_tar "$1"
       else
         return 1
@@ -522,16 +486,16 @@ upload_image() {
     $DOCKER push "$img:$tag"
   elif [ -n "$tar" ]; then
     echo "Uploading $img:$tag to registry ..."
-    exec_skopeo copy docker-archive:"$tar" docker://"$img:$tag"
+    $SKOPEO copy docker-archive:"$tar" docker://"$img:$tag"
   else
-    die "Missing tar file... can't upload image"
+    log_fatal "Missing tar file... can't upload image"
   fi
 }
 
 upload_images() {
   # sanity check both arrays, just in case...
   if [ "${#UPLOAD_NAMES[*]}" != "${#UPLOAD_TARS[*]}" ]; then
-    die "Upload image names array doesn't match the image tar archives"
+    log_fatal "Upload image names array doesn't match the image tar archives"
   fi
 
   if (( ${#UPLOAD_NAMES[*]} )) && [ -z "$SKIP_PUBLISH" ]; then
@@ -608,6 +572,7 @@ common_help() {
   --build-binary-out <path>  Specify the outlink path for the binaries (otherwise it's the current directory).
   --skopeo-copy              Don't load containers into host, simply copy them to registry with skopeo.
   --skip-cargo-deps          Don't prefetch the cargo build dependencies.
+  --helm-update              Force update helm dependencies.
 
 Environment Variables:
   RUSTFLAGS                  Set Rust compiler options when building binaries.
@@ -617,7 +582,8 @@ EOF
 CI=${CI-}
 DOCKER=$(docker_alias)
 NIX_BUILD="nix-build"
-NIX_EVAL="nix eval$(nix_experimental)"
+NIX="nix"
+NIX_EVAL="$NIX eval$(nix_experimental)"
 NIX_SHELL="nix-shell"
 RM="rm"
 TAR="tar"
@@ -625,6 +591,8 @@ HELM="helm"
 CURL="curl"
 SKOPEO="skopeo"
 ZCAT="zcat"
+SEMVER="semver"
+YQ="yq"
 SCRIPT_DIR=$(dirname "$0")
 TAG=$(get_tag)
 HASH=$(get_hash)
@@ -658,10 +626,12 @@ HELM_DEPS_IMAGES=${HELM_DEPS_IMAGES:-}
 HELM_CHART_DIR=${HELM_CHART_DIR:-}
 LOCAL_HELM=
 NIX_SOURCES=$(realpath "${NIX_SOURCES:-"$SCRIPT_DIR/../nix/sources.nix"}")
-DEFAULT_COMMON_BINS=("$CURL" "$DOCKER" "$TAR" "$RM" "$NIX_BUILD" "$ZCAT")
+DEFAULT_COMMON_BINS=("$CURL" "$DOCKER" "$TAR" "$RM" "$NIX_BUILD" "$ZCAT" "$NIX")
 COMMON_BINS=${COMMON_BINS:-"${DEFAULT_COMMON_BINS[@]}"}
 CONTAINER_LOAD="yes"
 LOCAL_SKOPEO=
+# Force helm dependency update
+HELM_DEP_UPDATE=${HELM_DEP_UPDATE:-"false"}
 
 binaries_check "${COMMON_BINS[@]}"
 helm_check
