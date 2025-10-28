@@ -377,12 +377,12 @@ fetch_nix_bin() {
   local bin="$2"
 
   if [ ! -f "$NIX_SOURCES" ]; then
-    log_fatal "$(binary_missing_msg "$HELM") or set NIX_SOURCES so we can pull it from nixpkgs"
+    log_fatal "$(binary_missing_msg "$package") or set NIX_SOURCES so we can pull it from nixpkgs"
   fi
   NIX_SOURCES=$(realpath "$NIX_SOURCES")
   binary_check_die "$NIX"
 
-  $NIX shell --impure $(nix_experimental) --expr "(import (import $NIX_SOURCES).nixpkgs {}).$package" -c which $bin
+  $NIX shell --impure $(nix_experimental) --expr "(import (import $NIX_SOURCES).nixpkgs {}).$package" -c bash -c "type -P $bin"
 }
 
 build_helm_deps() {
