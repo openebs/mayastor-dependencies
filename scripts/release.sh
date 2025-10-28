@@ -68,7 +68,7 @@ pre_fetch_cargo_deps() {
   local outLink="--no-out-link"
   local cargoVendorMsg=""
   if [ -n "$CARGO_VENDOR_DIR" ]; then
-    if [ "$(realpath -ms "$CARGO_VENDOR_DIR")" = "$(realpath -ms "$SCRIPT_DIR/..")" ]; then
+    if [ "$(realpath -ms "$CARGO_VENDOR_DIR")" = "${PARENT_ROOT:-}" ]; then
       cargoVendorDir="$CARGO_VENDOR_DIR/$GIT_BRANCH"
     else
       cargoVendorDir="$CARGO_VENDOR_DIR/$project/$GIT_BRANCH"
@@ -233,6 +233,13 @@ parse_common_arg() {
       ;;
     --debug)
       BUILD_TYPE="debug"
+      shift
+      ;;
+    --debug-slim)
+      BUILD_TYPE="debug"
+      if [ -z "${RUSTFLAGS:-}" ]; then
+        RUSTFLAGS="-C debuginfo=0 -C strip=debuginfo"
+      fi
       shift
       ;;
     --incremental)
@@ -535,6 +542,58 @@ build_bins() {
   fi
 }
 
+get_nix_src() {
+  if [ -n "${PARENT_ROOT}" ]; then
+    echo "$(realpath "${NIX_SOURCES:-${PARENT_ROOT}/nix/sources.nix}")"
+  else
+    echo "$(realpath "${NIX_SOURCES}")"
+  fi
+}
+
+get_parent() {
+  # Check if specified by parent
+  if [ -n "${PARENT_ROOT_DIR:-}" ]; then
+    echo "$PARENT_ROOT_DIR"
+    return 0
+  fi
+
+  # Mayastor control-plane
+  if [ -n "${WORKSPACE_ROOT:-}" ]; then
+    echo "$WORKSPACE_ROOT"
+    return 0
+  fi
+
+  # Mayastor extensions
+  if [ -n "${EXTENSIONS_SRC:-}" ]; then
+    echo "$EXTENSIONS_SRC"
+    return 0
+  fi
+
+  # OpenEBS umbrella
+  if [ -n "${OPENEBS_SRC:-}" ]; then
+    echo "$OPENEBS_SRC"
+    return 0
+  fi
+
+  # Figure it out using the git top-level
+  if command -v git &>/dev/null; then
+    git rev-parse --show-toplevel
+    return 0
+  fi
+
+  # From the current path
+  if [ -d "${PWD:-.}/nix" ]; then
+    echo "${PWD:-.}"
+    return 0
+  fi
+
+  # Using the io-engine
+  if [ -n "${SRCDIR:-}" ]; then
+    echo "$SRCDIR"
+    return 0
+  fi
+}
+
 # Set up the container aliases, build the binaries, and build/upload the images
 common_run() {
   parse_common_args $@
@@ -557,6 +616,7 @@ common_help() {
   --registry <host[:port]>   Push the built images to the provided registry.
                              To also replace the image org provide the full repository path, example: docker.io/org
   --debug                    Build debug version of images where possible.
+  --debug-slim               Build slim debug version of images where possible. (sets RUSTFLAGS="-C debuginfo=0 -C strip=debuginfo")
   --skip-build               Don't perform nix-build.
   --skip-publish             Don't publish built images.
   --image           <image>  Specify what image to build and/or upload.
@@ -594,6 +654,7 @@ ZCAT="zcat"
 SEMVER="semver"
 YQ="yq"
 SCRIPT_DIR=$(dirname "$0")
+PARENT_ROOT="$(realpath -es "$(get_parent)" 2>/dev/null || :)"
 TAG=$(get_tag)
 HASH=$(get_hash)
 PRODUCT_PREFIX=${MAYASTOR_PRODUCT_PREFIX:-""}
@@ -624,8 +685,7 @@ IMAGE_LOAD_TAR=
 # Images which require helm chart dependency update
 HELM_DEPS_IMAGES=${HELM_DEPS_IMAGES:-}
 HELM_CHART_DIR=${HELM_CHART_DIR:-}
-LOCAL_HELM=
-NIX_SOURCES=$(realpath "${NIX_SOURCES:-"$SCRIPT_DIR/../nix/sources.nix"}")
+NIX_SOURCES=$(get_nix_src)
 DEFAULT_COMMON_BINS=("$CURL" "$DOCKER" "$TAR" "$RM" "$NIX_BUILD" "$ZCAT" "$NIX")
 COMMON_BINS=${COMMON_BINS:-"${DEFAULT_COMMON_BINS[@]}"}
 CONTAINER_LOAD="yes"
