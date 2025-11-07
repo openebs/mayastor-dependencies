@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 
+JQ=${JQ:-"jq"}
+YQ=${YQ:-"yq"}
+
 helm_dep_update_required() {
   local chart="$1"
 
-  repository=$(echo "$chart" | jq -r '.repository')
-  version=$(echo "$chart" | jq -r '.version')
-  name=$(echo "$chart" | jq -r '.name')
-  tar=$(echo "$chart" | jq -r '.tar')
+  repository=$(echo "$chart" | $JQ -r '.repository')
+  version=$(echo "$chart" | $JQ -r '.version')
+  name=$(echo "$chart" | $JQ -r '.name')
+  tar=$(echo "$chart" | $JQ -r '.tar')
 
   if [ "$($SEMVER validate "$version")" != "valid" ]; then
     die "Found $name with version $version only pinned versions are supported!"
@@ -40,23 +43,23 @@ helm_all_deps() {
   fi
   local all_deps deps
 
-  if ! deps=$($HELM show chart "$chart_dir" --kubeconfig "$chart_dir/fake" | $YQ -o=json ".dependencies[]" | jq -c); then
+  if ! deps=$($HELM show chart "$chart_dir" --kubeconfig "$chart_dir/fake" | $YQ -o=json ".dependencies[]" | $JQ -c); then
     log_fatal "Can't find the helm dependencies in $chart_dir"
   fi
 
   for chart in ${deps[@]}; do
-    repository=$(echo "$chart" | jq -r '.repository')
-    name=$(echo "$chart" | jq -r '.name')
-    version=$(echo "$chart" | jq -r '.version')
+    repository=$(echo "$chart" | $JQ -r '.repository')
+    name=$(echo "$chart" | $JQ -r '.name')
+    version=$(echo "$chart" | $JQ -r '.version')
 
     local name_rel="charts/$name"
     if [ -n "${repository:-}" ]; then
       local chart_tar="$chart_dir/$name_rel-$version.tgz"
-      chart=$(echo "$chart" | jq -c ".tar = \"$chart_tar\"")
+      chart=$(echo "$chart" | $JQ -c ".tar = \"$chart_tar\"")
 
       if [ -n "$chart_rel" ]; then
         local chart_loc="$chart_dir"
-        chart=$(echo "$chart" | jq -c ".chart = \"$chart_loc\"")
+        chart=$(echo "$chart" | $JQ -c ".chart = \"$chart_loc\"")
       fi
 
       if [ -n "${all_deps:-}" ]; then
@@ -116,7 +119,7 @@ helm_dep_update() {
     echo "Updating helm chart dependencies ..."
     $HELM dependency update "$chart_dir" --kubeconfig "$chart_dir/fake"
     while read -r chart; do
-      chart_loc=$(echo "$chart" | jq -r '.chart')
+      chart_loc=$(echo "$chart" | $JQ -r '.chart')
       if [ -n "$chart_loc" ] && [ "$chart_loc" != "null" ]; then
         $HELM dependency update "$chart_loc" --kubeconfig "$chart_dir/fake"
       fi
