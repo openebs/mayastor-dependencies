@@ -374,6 +374,9 @@ helm_check() {
   if ! binary_check "$SEMVER"; then
     SEMVER=$(fetch_nix_bin "semver-tool" "semver")
   fi
+  if ! binary_check "$JQ"; then
+    JQ=$(fetch_nix_bin "jq" "jq")
+  fi
   if ! binary_check "$YQ"; then
     YQ=$(fetch_nix_bin "yq-go" "yq")
   fi
@@ -653,6 +656,7 @@ SKOPEO="skopeo"
 ZCAT="zcat"
 SEMVER="semver"
 YQ="yq"
+JQ="jq"
 SCRIPT_DIR=$(dirname "$0")
 PARENT_ROOT="$(realpath -es "$(get_parent)" 2>/dev/null || :)"
 TAG=$(get_tag)
