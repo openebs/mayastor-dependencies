@@ -700,6 +700,6 @@ HELM_DEP_UPDATE=${HELM_DEP_UPDATE:-"false"}
 binaries_check "${COMMON_BINS[@]}"
 helm_check
 
-cd "$SCRIPT_DIR/.."
+cd "$PARENT_ROOT"
 
 trap cleanup_tars EXIT
