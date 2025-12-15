@@ -4,13 +4,13 @@ version = "1.0.0"
 edition = "2018"
 
 [dependencies]
-nix = { version = "0.29.0", default-features = false, features = ["feature"] }
-semver = "1.0.23"
-snafu = "0.8.5"
-url = "2.5.2"
-uuid = { version = "1.11.0", features = ["v4"] }
+nix = { workspace = true, default-features = false, features = ["feature"] }
+semver = { workspace = true }
+snafu = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 [build-dependencies]
-bindgen = "0.70.1"
+bindgen = { workspace = true }
 
 [target.'cfg(target_os="linux")'.dependencies]
-udev = "0.9.1"
+udev = { workspace = true }
