@@ -4,8 +4,4 @@ set -euo pipefail
 
 FMT_OPTS=${FMT_OPTS:-"--config imports_granularity=Crate"}
 
-for d in `find -maxdepth 3 -name Cargo.toml -printf '%h\n' | grep -v "^./h2" | grep -v "git-version-macro"`; do
-    pushd $d
-    cargo-fmt --all -- $FMT_OPTS
-    popd
-done
+cargo-fmt --all -- $FMT_OPTS
