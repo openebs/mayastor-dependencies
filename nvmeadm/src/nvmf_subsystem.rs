@@ -30,6 +30,8 @@ pub struct Subsystem {
     pub serial: String,
     /// Model number.
     pub model: String,
+    /// NVMe Host Qualified Name (NQN).
+    pub hostnqn: String,
 }
 
 const TR_ADDR: &str = "traddr";
@@ -165,6 +167,7 @@ impl Subsystem {
         let address = parse_value::<String>(source, "address")?;
         let serial = parse_value::<String>(source, "serial")?;
         let model = parse_value::<String>(source, "model")?;
+        let hostnqn = parse_value::<String>(source, "hostnqn")?;
 
         if serial.is_empty() || model.is_empty() {
             return Err(NvmeError::CtlNotFound {
@@ -185,6 +188,7 @@ impl Subsystem {
             address: SubsystemAddr(address),
             serial,
             model,
+            hostnqn,
         })
     }
     /// Synchronize in-memory state of this subsystem with system's state.
