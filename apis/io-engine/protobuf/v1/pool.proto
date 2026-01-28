@@ -16,9 +16,14 @@ service PoolRpc {
   rpc DestroyPool (DestroyPoolRequest) returns (google.protobuf.Empty) {}
   rpc ExportPool (ExportPoolRequest) returns (google.protobuf.Empty) {}
   rpc ImportPool (ImportPoolRequest) returns (Pool) {}
+
   rpc ListPools (ListPoolOptions) returns (ListPoolsResponse) {}
+
   rpc GrowPool (GrowPoolRequest) returns (GrowPoolResponse) {}
   rpc GrowPoolV2 (GrowPoolRequest) returns (Pool) {}
+
+  // Clear error counters and alerts
+  rpc ClearErrors (ClearErrorRequest) returns (Pool) {}
 }
 
 // Specifies the type of the pool
@@ -96,6 +101,7 @@ enum PoolState {
   POOL_ONLINE = 1;   // the pool is in normal working order
   POOL_DEGRADED = 2; // the pool has experienced a failure but can still function
   POOL_FAULTED = 3;  // the pool is completely inaccessible
+  POOL_SUSPECTED = 4; // the pool is suspected to have some issues due to warning alerts
 }
 
 // Storage pool properties
@@ -133,6 +139,10 @@ message Pool {
   optional bool encrypted = 13;
   // Maximum capacity upto which this pool can be expanded, in bytes.
   optional uint64 max_expandable_size = 14;
+  // Information for each pool disk.
+  repeated DiskInfo disk_info = 15;
+  // Error information at the pool top-level.
+  optional PoolErrors errors = 16;
 }
 
 // Pool metadata info.
@@ -190,4 +200,90 @@ message GrowPoolResponse {
   // to determine how much the pool has grown, and if the growth
   // actually occurred.
   Pool current_pool = 2;
+}
+
+message PoolErrors {
+  // These are generated from the below metrics
+  PoolAlerts                    alerts = 1;
+
+  // Disk IO errors
+  uint64                io_error_count = 2;
+  uint64            io_error_threshold = 3;
+
+  // Disk IO stalls
+  bool                      io_stalled = 4;
+  uint64     io_stall_transition_count = 5;
+  uint64 io_stall_transition_threshold = 6;
+}
+
+message PoolAlerts {
+  PoolAlertStatus       status = 1;
+
+  // No status alerts are raised
+  repeated PoolAlert    notice = 2;
+  repeated PoolAlert attention = 3;
+  // Warnings downgrades the pool state to Suspected
+  repeated PoolAlert   warning = 4;
+  // Pools with critical alerts should not be used
+  repeated PoolAlert  critical = 5;
+}
+
+enum PoolAlertStatus {
+  // No issues detected; pool is operating normally
+  Healthy   = 0;
+
+  // Non‑critical issues present; user attention is recommended
+  Attention = 1;
+
+  // Conditions have exceeded warning thresholds (fixed or based on trends over a defined time window)
+  Warning   = 2;
+
+  // Severe issues detected; pool usage should be avoided
+  Critical  = 3;
+}
+
+enum PoolAlert {
+  // Unrecognized or unsupported alert type
+  Unknown                = 0;
+
+  // Pool I/O is currently stalled
+  IoStalled              = 1;
+
+  // I/O is not stalled as of now, but stalls have occurred over a defined time window
+  IoStallIntermittent    = 2;
+
+  // I/O is not stalled as of now, but stalls have occurred too frequently over a defined time window
+  IoStallIntermittentExc = 3;
+
+  // I/O errors have been detected for the pool
+  IoError                = 4;
+
+  // I/O errors exceed defined thresholds
+  IoErrorExc             = 5;
+}
+
+message DiskInfo {
+  // The disk uri used to open the disk
+  string uri = 1;
+  // Errors seen for this disk
+  PoolErrors errors = 2;
+}
+
+message ClearErrorRequest {
+  // Name of the pool
+  string          name = 1;
+  // Uuid of the pool
+  optional string uuid = 2;
+
+  // If one or more disks is specified, only those errors associated with the specified disk or disks are cleared.
+  repeated string disks = 3;
+
+  // Error clearing request
+  ClearErrors clear = 4;
+}
+
+enum ClearErrors {
+  // Clears all counted errors and related alerts
+  // Example, it clears the io stall transitions, but doesn't clear an io stall
+  ClearAll = 0;
 }
