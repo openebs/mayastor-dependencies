@@ -24,6 +24,9 @@ service PoolRpc {
 
   // Clear error counters and alerts
   rpc ClearErrors (ClearErrorRequest) returns (Pool) {}
+
+  // Pool disk probing
+  rpc ProbePool(ProbePoolRequest) returns (ProbePoolResponse) { }
 }
 
 // Specifies the type of the pool
@@ -286,4 +289,92 @@ enum ClearErrors {
   // Clears all counted errors and related alerts
   // Example, it clears the io stall transitions, but doesn't clear an io stall
   ClearAll = 0;
+}
+
+// Probe disks for pool create/import readiness.
+// This RPC should try very hard not to fail and rather succeed with information about the probe errors it found.
+// Also no error messages related to this probing should be displayed to avoid polluting the logs.
+// Errors
+// This RPC may fail with `ALREADY_EXISTS` if the pool is already loaded and the disks match the request.
+message ProbePoolRequest {
+  ImportPoolRequest request = 1;
+
+  // The requested completeness probes.
+  // Disk presence probe is always implicitly performed and cannot be disabled.
+  optional PoolProbes probes = 2;
+}
+
+message PoolProbes {
+  // Issue a Read IO to the pool/disks and check for success within short timeout.
+  bool          test_read = 1;
+  // Read must complete within this amount of time for a success.
+  uint64        test_read_tmo_secs = 2;
+
+  // Read pool super-block and check for its validity.
+  bool          validate_sb = 3;
+}
+
+message ProbeDiskInfo {
+  // A disk specified for probing.
+  string disk = 1;
+
+  // Any errors found by the probe.
+  repeated ProbeError error = 2;
+}
+
+message ProbeError {
+  // A value representing the encountered error.
+  ProbeErrorCode code = 1;
+  // Additional information as human readable.
+  optional string msg = 2;
+}
+
+enum ProbeErrorCode {
+  // It's an unknown error, we don't have a valid code for it.
+  ProbeUnknown = 0;
+  // The Disk was not found in the system.
+  DiskNotFound = 1;
+  // If the Disk is already claimed by something.
+  // This may happen if the disk is used by another pool for example.
+  DiskClaimed = 2;
+  // PCI driver not supported.
+  PCIDriverUnsupported = 3;
+  // PCI still bound to kernel nvme driver.
+  PCIKernelBound = 4;
+  // PCI BDF exists but it's not an NVMe device.
+  PCINotNvme = 5;
+  // Disk read I/O errors.
+  DiskReadIoError = 6;
+  // The disk URI is invalid or not supported.
+  InvalidDiskUri = 7;
+  // Pool on-disk name doesn't match the expected value.
+  ForeignPoolName = 8;
+  // Pool on-disk uuid doesn't match the expected value.
+  ForeignPoolUid = 9;
+  // I/O error encountered when trying to read the pool super block.
+  SuperBlockIoError = 10;
+  // Invalid super block (eg: CRC error, likely metadata corruption).
+  InvalidSuperBlock = 11;
+}
+
+message PoolProbeMeta {
+  // The name of the pool found in the specified disks (if any).
+  string name = 1;
+  // The uuid of the pool found in the specified disks.
+  string uuid = 2;
+}
+
+message ProbePoolResponse {
+  // Specified probes found no issues.
+  bool success = 1;
+  // The probes which were actually performed.
+  // This is useful for compatibility, as the server may not support
+  // all the requested probes.
+  PoolProbes probed = 2;
+
+  // If super block was read successfully, this is its info.
+  PoolProbeMeta metadata = 3;
+
+  // All the probe errors (per disk).
+  map<string,ProbeDiskInfo> errors = 4;
 }
