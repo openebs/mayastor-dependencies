@@ -43,7 +43,8 @@ pub mod pool {
         ClearErrorRequest, ClearErrors, CreatePoolRequest, DestroyPoolRequest, DiskInfo,
         ExportPoolRequest, GrowPoolRequest, GrowPoolResponse, ImportPoolRequest, ListPoolOptions,
         ListPoolsResponse, Pool, PoolAlert, PoolAlertStatus, PoolAlerts, PoolErrors,
-        PoolMetadataArgs, PoolMetadataInfo, PoolState, PoolType, PoolTypeValue,
+        PoolMetadataArgs, PoolMetadataInfo, PoolProbes, PoolState, PoolType, PoolTypeValue,
+        ProbeDiskInfo, ProbeError, ProbeErrorCode, ProbePoolRequest, ProbePoolResponse,
     };
 }
 
