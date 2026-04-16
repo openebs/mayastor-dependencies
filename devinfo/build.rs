@@ -1,7 +1,9 @@
 #[cfg(target_os = "linux")]
+#[cfg(feature = "bindgen")]
 use std::{env, path::PathBuf};
 
 #[cfg(target_os = "linux")]
+#[cfg(feature = "bindgen")]
 fn main() {
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
@@ -18,4 +20,8 @@ fn main() {
 }
 
 #[cfg(not(target_os = "linux"))]
+fn main() {}
+
+#[cfg(target_os = "linux")]
+#[cfg(not(feature = "bindgen"))]
 fn main() {}
