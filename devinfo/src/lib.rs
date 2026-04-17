@@ -8,6 +8,7 @@ pub mod partition;
 
 #[allow(non_camel_case_types)]
 #[cfg(target_os = "linux")]
+#[cfg(feature = "bindgen")]
 pub mod blkid;
 
 #[derive(Debug, Snafu)]

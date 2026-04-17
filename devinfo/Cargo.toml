@@ -10,7 +10,10 @@ snafu = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 [build-dependencies]
-bindgen = { workspace = true }
+bindgen = { workspace = true, optional = true}
 
 [target.'cfg(target_os="linux")'.dependencies]
 udev = { workspace = true }
+
+[features]
+default = ["bindgen"]
