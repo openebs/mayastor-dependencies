@@ -146,6 +146,8 @@ message Pool {
   repeated DiskInfo disk_info = 15;
   // Error information at the pool top-level.
   optional PoolErrors errors = 16;
+  // How many replicas reside in the pool.
+  optional uint64 replica_count = 17;
 }
 
 // Pool metadata info.
