@@ -299,9 +299,12 @@ enum ClearErrors {
 message ProbePoolRequest {
   ImportPoolRequest request = 1;
 
+  // Probing for import or creation (ie null or malloc import may not apply for import)
+  bool import = 2;
+
   // The requested completeness probes.
   // Disk presence probe is always implicitly performed and cannot be disabled.
-  optional PoolProbes probes = 2;
+  optional PoolProbes probes = 3;
 }
 
 message PoolProbes {
@@ -355,6 +358,10 @@ enum ProbeErrorCode {
   SuperBlockIoError = 10;
   // Invalid super block (eg: CRC error, likely metadata corruption).
   InvalidSuperBlock = 11;
+  // Disk is not importable (ie malloc).
+  DiskNotImportable = 12;
+  // Probing is not implemented for this URI.
+  UriNotHandled = 13;
 }
 
 message PoolProbeMeta {
