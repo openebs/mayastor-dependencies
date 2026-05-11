@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["rls-aws-lc-rs"]
+default = ["rls-ring"]
 rls-aws-lc-rs = ["events-api/rls-aws-lc-rs"]
+rls-ring = ["events-api/rls-ring"]
 
 [dependencies]
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
