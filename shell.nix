@@ -18,13 +18,12 @@ let
     });
 in
 with pkgs;
-pkgs.mkShell {
+pkgs.mkShellNoCC {
   buildInputs = [
     rust-bin
     cacert
     cargo-udeps
     clang
-    openssl
     pkg-config
     protobuf
     udev

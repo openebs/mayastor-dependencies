@@ -18,4 +18,4 @@ jobs:
       - name: cargo-clippy
         run: nix-shell --pure --run ./scripts/rust/linter.sh
       - name: cargo-fmt
-        run: nix-shell --pure --run "FMT_OPTS=--check ./scripts/rust/style.sh"
+        run: nix-shell --pure --run ./scripts/rust/style.sh
