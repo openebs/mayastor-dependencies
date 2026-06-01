@@ -40,6 +40,8 @@ message ReplicaIoStatsResponse {
 message ReplicaIoStats {
   optional string entity_id = 1; // Entity ID of the replica, If any.
   IoStats stats = 2; // IO stats of the replica.
+  optional string poolname = 3; // Name of the pool hosting this replica.
+  optional string pooluuid = 4; // UUID of the pool hosting this replica.
 }
 
 // Common IO stats struct for all resource types.
