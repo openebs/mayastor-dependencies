@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use mbus_nats::{BusResult, BusSubscription};
 use serde::{de::DeserializeOwned, Serialize};
 
-mod common;
+pub mod common;
 pub mod event_traits;
 pub mod mbus_nats;
 

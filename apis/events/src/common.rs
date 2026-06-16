@@ -5,4 +5,4 @@ pub(crate) mod constants;
 pub(crate) mod errors;
 
 /// Retry module for jetstream server.
-pub(crate) mod retry;
+pub mod retry;
