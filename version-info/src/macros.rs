@@ -47,15 +47,6 @@ macro_rules! version_info_string {
     };
 }
 
-/// Gets package's version info as a static str.
-/// Each call to this macro leaks a string.
-#[macro_export]
-macro_rules! version_info_str {
-    () => {
-        Box::leak(Box::new(String::from($crate::version_info!()))) as &'static str
-    };
-}
-
 /// Formats package related information.
 /// This includes the package name and version, and commit info.
 #[macro_export]
