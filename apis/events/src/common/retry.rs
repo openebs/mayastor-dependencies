@@ -68,18 +68,22 @@ impl BackoffOptions {
             max_retries: 10,
         }
     }
+
+    /// Compute the backoff delay for a given attempt count.
+    pub fn delay(&self, tries: u32) -> Duration {
+        if tries <= self.cutoff {
+            self.init_delay
+        } else {
+            min(
+                self.init_delay + tries.saturating_sub(self.cutoff + 1) * self.step,
+                self.max_delay,
+            )
+        }
+    }
 }
 
-/// Simple backoff delay which get gradually larger up to a 'max' duration.
+/// Increment `tries` and sleep for the computed backoff duration.
 pub async fn backoff_with_options(tries: &mut u32, options: &BackoffOptions) {
     *tries += 1;
-    let backoff = if *tries <= options.cutoff {
-        options.init_delay
-    } else {
-        min(
-            options.init_delay + (*tries - options.cutoff - 1) * options.step,
-            options.max_delay,
-        )
-    };
-    tokio::time::sleep(backoff).await;
+    tokio::time::sleep(options.delay(*tries)).await;
 }
