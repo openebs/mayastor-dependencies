@@ -232,6 +232,7 @@ message Nexus {
   repeated string allowed_hosts = 9; // host (nqn's) which are allowed to connect to the target
   optional NexusLabelVersion label_version = 10; // version of the nexus label layoyut
   optional uint64 bdev_size = 11; // the actual size of the nexus block device
+  optional bool read_only = 12; // true when the nexus is currently published as ROX and rejects writes
 }
 
 message CreateNexusResponse {
@@ -306,6 +307,11 @@ message PublishNexusRequest {
   string key = 2; // encryption key
   ShareProtocol share = 3;  // protocol used for the front end.
   repeated string allowed_hosts = 4; // host (nqn's) which are allowed to connect to the target.
+  // When true, the target rejects write I/O at submit time and skips acquiring
+  // write-exclusive reservations on the nexus children. Used for the
+  // ReadOnlyMany (ROX) access mode. Scoped to this publish; a re-publish with
+  // a different value flips the mode.
+  optional bool read_only = 5;
 }
 
 message PublishNexusResponse {
