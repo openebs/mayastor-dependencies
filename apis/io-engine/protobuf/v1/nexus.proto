@@ -14,6 +14,7 @@ service NexusRpc {
   // Nexus is a logical frontend representing a data volume taking care of
   // replication and rebuild in the background.
 
+  rpc CreateNexusV2 (CreateNexusV2Request) returns (CreateNexusResponse) {}
   rpc CreateNexus (CreateNexusRequest) returns (CreateNexusResponse) {}
   rpc DestroyNexus (DestroyNexusRequest) returns (google.protobuf.Empty) {}
   rpc ResizeNexus (ResizeNexusRequest) returns (ResizeNexusResponse) {}
@@ -47,7 +48,83 @@ service NexusRpc {
   rpc GetRebuildStats (RebuildStatsRequest) returns (RebuildStatsResponse) {}
   rpc GetRebuildHistory (RebuildHistoryRequest) returns (RebuildHistoryResponse) {}
   rpc ListRebuildHistory (ListRebuildHistoryRequest) returns (ListRebuildHistoryResponse) {}
+}
 
+// The label versioning for the nexus
+enum NexusLabelVersion {
+  LabelUnknown = 0;
+  // On version 1, there was no label writing to disk/children.
+  // The actual user data starts at offset 5MiB of the nexus child.
+  // The actual user data size is calculated from the data start to the end which is right before the
+  //  start of the secondary/backup GPT.
+  //
+  // Layout as seen in the child:
+  //
+  // 0     ───── reserved for protective MBR
+  // 1     ───── reserved for primary GPT header
+  // 2     ──┐
+  //         ├── reserved for GPT entries
+  // 33    ──┘
+  // 34    ──┐
+  //         ├── unused
+  // 2047  ──┘
+  // 2048  ──┐
+  //         ├── 4M reserved for metadata
+  // 10239 ──┘
+  // 10240 ──┐
+  //         ├── available for user data (this is what the nexus bdev exposes)
+  // N-35  ──┘
+  // N-34  ──┘ This is actually where it was supposed to be, but there's an off by 1 bug! :)
+  // N-33  ──┐
+  //         ├── reserved for the copy of GPT entries
+  // N-2   ──┘
+  // N-1   ───── last device block, reserved for secondary GPT header
+  LabelV1 = 1;
+  // On version 2, there's still no label writing to disk/children
+  // The actual user data starts at offset 4MiB of the nexus child.
+  // This is because the metadata size is reduced to 3MiB.
+  // This allows us to align the user data to the default cluster size of 4MiB.
+  // It's not a fully foolproof solution, but we can always tweak this in a future version bump!
+  // The actual user data size is calculated from the data start to the end which is now aligned
+  //  to 4 MiB.
+  // The last 4MiB are never allocated on a default 4MiB cluster.
+  // If the cluster size is larger than 4MiB then it will be allocated - as mentioned above, this
+  // is a limitation of this version.
+  // (replacing 4MiB with cluster size will also require changing the wipe of the first 8MiB
+  //  when replicas are created to ensure typical fs data is cleared)
+  //
+  // Layout as seen in the child:
+  //
+  // 0     ───── reserved for protective MBR
+  // 1     ───── reserved for primary GPT header
+  // 2     ──┐
+  //         ├── reserved for GPT entries
+  // 33    ──┘
+  // 34    ──┐
+  //         ├── unused
+  // 2047  ──┘
+  // 2048  ──┐
+  //         ├── 3M reserved for metadata
+  // 8191  ──┘
+  // 8192     ────┐
+  //              ├── available for user data (this is what the nexus bdev exposes)
+  // N-4MiB-1 ────┘
+  // N-4MiB   ──┐
+  //            ├── void to ensure user data is a multiple of 1MiB (we use 4MiB to again match cluster size)
+  // N-34     ──┘
+  // N-33  ──┐
+  //         ├── reserved for the copy of GPT entries
+  // N-2   ──┘
+  // N-1   ───── last device block, reserved for secondary GPT header
+  LabelV2 = 2;
+}
+
+message CreateNexusV2Request {
+  // The original create nexus request
+  CreateNexusRequest v1 = 1;
+  // The required label version
+  // If unknown then it should get rejected as unsupported and the nexus can not be created
+  NexusLabelVersion label_version = 2;
 }
 
 // Create nexus arguments.
@@ -150,6 +227,7 @@ message Nexus {
   uint32 rebuilds = 7;         // total number of rebuild tasks
   NvmeAnaState ana_state = 8;  // Nexus ANA state.
   repeated string allowed_hosts = 9; // host (nqn's) which are allowed to connect to the target
+  NexusLabelVersion label_version = 10; // version of the nexus label layoyut
 }
 
 message CreateNexusResponse {

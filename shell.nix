@@ -30,6 +30,8 @@ pkgs.mkShellNoCC {
     util-linux
     commitlint
     git
+    xz
+    llvmPackages.lld
   ] ++ pkgs.lib.optional (usePreCommit) pre-commit;
 
   LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
