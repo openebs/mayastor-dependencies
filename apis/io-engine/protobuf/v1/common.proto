@@ -19,6 +19,9 @@ message MayastorFeatures {
   optional bool rdmaCapableIoEngine = 4;
   // Diskpool encryption capability.
   optional bool diskpoolEncryption = 5;
+  // Support for nexus label version via create_nexus2.
+  // This returns the latest version supported.
+  uint32 nexus_label_version = 6;
 }
 
 message MayastorBugFixes {

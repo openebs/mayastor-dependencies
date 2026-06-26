@@ -125,6 +125,9 @@ message CreateNexusV2Request {
   // The required label version
   // If unknown then it should get rejected as unsupported and the nexus can not be created
   NexusLabelVersion label_version = 2;
+  // Requires the nexus to be exactly of the requested size
+  // For this to work this requires the children to be sufficiently large
+  bool              required_size = 3;
 }
 
 // Create nexus arguments.
@@ -227,7 +230,8 @@ message Nexus {
   uint32 rebuilds = 7;         // total number of rebuild tasks
   NvmeAnaState ana_state = 8;  // Nexus ANA state.
   repeated string allowed_hosts = 9; // host (nqn's) which are allowed to connect to the target
-  NexusLabelVersion label_version = 10; // version of the nexus label layoyut
+  optional NexusLabelVersion label_version = 10; // version of the nexus label layoyut
+  optional uint64 bdev_size = 11; // the actual size of the nexus block device
 }
 
 message CreateNexusResponse {
