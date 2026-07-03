@@ -55,6 +55,8 @@ prost = "0.13.2"
 prost-derive = "0.13.3"
 bytes = "1.8.0"
 prost-build = "0.13.3"
+pbjson = "0.7.0"
+pbjson-build = "0.7.0"
 
 udev = "0.9.1"
 bindgen = "0.69.5"
