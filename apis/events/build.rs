@@ -6,6 +6,16 @@ fn main() {
         .file_descriptor_set_path(&descriptor_path)
         .extern_path(".google.protobuf.Timestamp", "::prost_extend::Timestamp")
         .extern_path(".google.protobuf.Duration", "::prost_extend::Duration")
+        .enum_attribute(
+            "v1.event.EventCategory",
+            "#[derive(strum_macros::EnumIter, strum_macros::Display, strum_macros::EnumString)]\
+             \n#[strum(serialize_all = \"kebab-case\")]",
+        )
+        .enum_attribute(
+            "v1.event.EventAction",
+            "#[derive(strum_macros::EnumIter, strum_macros::Display, strum_macros::EnumString)]\
+             \n#[strum(serialize_all = \"kebab-case\")]",
+        )
         .compile_protos(&["protobuf/v1/event.proto"], &["protobuf/"])
         .unwrap_or_else(|e| panic!("event v1 protobuf compilation failed: {e}"));
 

@@ -29,3 +29,5 @@ prost = { workspace = true }
 chrono = { workspace = true }
 prost-extend = { path = "../../prost-extend" }
 pbjson = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
