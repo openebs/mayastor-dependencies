@@ -16,6 +16,16 @@ fn main() {
             "#[derive(strum_macros::EnumIter, strum_macros::Display, strum_macros::EnumString)]\
              \n#[strum(serialize_all = \"kebab-case\")]",
         )
+        .enum_attribute(
+            "v1.event.Component",
+            "#[derive(strum_macros::EnumIter, strum_macros::Display)]\
+             \n#[strum(serialize_all = \"kebab-case\")]",
+        )
+        .enum_attribute(
+            "v1.event.RebuildStatus",
+            "#[derive(strum_macros::EnumIter, strum_macros::Display, strum_macros::EnumString)]\
+             \n#[strum(serialize_all = \"kebab-case\")]",
+        )
         .compile_protos(&["protobuf/v1/event.proto"], &["protobuf/"])
         .unwrap_or_else(|e| panic!("event v1 protobuf compilation failed: {e}"));
 
