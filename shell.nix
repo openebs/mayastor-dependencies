@@ -1,4 +1,4 @@
-{ profile ? "stable", version ? "1.88.0" }:
+{ profile ? "stable", version ? "1.97.1" }:
 let
   sources = import ./nix/sources.nix;
   pkgs = import sources.nixpkgs {
