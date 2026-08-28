@@ -1,0 +1,71 @@
+name: 'Push Multi-Arch Container Images'
+description: >-
+  Download the per-arch image archives built by the image-build action and
+  assemble/push them as multi-arch manifest lists to the registry.
+inputs:
+  tag:
+    description: 'Explicit tag for the images (overrides the git tag)'
+    default: ''
+  registry:
+    description: 'Registry (and optionally org) to prefix the image names with'
+    default: ''
+  script:
+    description: 'Path to the release script'
+    default: './scripts/release.sh'
+  artifact-prefix:
+    description: 'Prefix of the image artifact names to download'
+    default: 'images'
+  dockerhub-username:
+    description: 'Docker Hub username to login with'
+    default: ''
+  dockerhub-password:
+    description: 'Docker Hub password/token to login with'
+    default: ''
+  ghcr-token:
+    description: 'Token to login to ghcr.io with'
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Fetch the annotated tag
+      if: github.ref_type == 'tag'
+      shell: bash
+      run: |
+        # BUG: HEAD tag is fetched as lightweight instead of annotated
+        # https://github.com/actions/checkout/issues/290
+        git fetch -f origin ${{ github.ref }}:${{ github.ref }}
+    - uses: cachix/install-nix-action@v31.11.0
+    - name: Login to Docker Hub
+      if: inputs.dockerhub-username != ''
+      uses: docker/login-action@v4
+      with:
+        username: ${{ inputs.dockerhub-username }}
+        password: ${{ inputs.dockerhub-password }}
+    - name: Login to GHCR
+      if: inputs.ghcr-token != ''
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.ghcr-token }}
+    - name: Download the image archives
+      uses: actions/download-artifact@v7
+      with:
+        pattern: ${{ inputs.artifact-prefix }}-*
+        path: images/
+        merge-multiple: true
+    - name: Assemble and push the multi-arch images
+      shell: bash
+      env:
+        IMG_TAG: ${{ inputs.tag }}
+        IMG_REGISTRY: ${{ inputs.registry }}
+        RELEASE_SCRIPT: ${{ inputs.script }}
+      run: |
+        args=(--manifest-tars images)
+        if [ -n "$IMG_TAG" ]; then
+          args+=(--tag "$IMG_TAG")
+        fi
+        if [ -n "$IMG_REGISTRY" ]; then
+          args+=(--registry "$IMG_REGISTRY")
+        fi
+        "$RELEASE_SCRIPT" "${args[@]}"

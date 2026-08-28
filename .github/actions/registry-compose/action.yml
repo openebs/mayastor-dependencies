@@ -1,0 +1,50 @@
+name: 'Compose Container Registry'
+description: >-
+  Validate and compose the fully-qualified image registry prefix from the
+  registry host, owner/org and optional namespace, as "<registry>/<owner>[/<namespace>]".
+inputs:
+  registry:
+    description: 'Registry host (must not contain a slash), example: ghcr.io. Empty means use the image defaults.'
+    default: ''
+  owner:
+    description: 'Repository owner (defaults to github.repository_owner if empty)'
+    required: true
+  namespace:
+    description: 'Optional namespace/sub-path appended after the owner, example: mayastor/dev'
+    default: ''
+outputs:
+  registry:
+    description: 'The composed registry prefix, or empty when no registry was given'
+    value: ${{ steps.compose.outputs.registry }}
+runs:
+  using: composite
+  steps:
+    - name: Compose the registry
+      id: compose
+      shell: bash
+      env:
+        REGISTRY_IN: ${{ inputs.registry }}
+        OWNER_IN: ${{ inputs.owner }}
+        NAMESPACE_IN: ${{ inputs.namespace }}
+      run: |
+        registry=""
+        if [ -n "$REGISTRY_IN" ]; then
+          if [[ "$REGISTRY_IN" == */* ]]; then
+            echo "::error::registry must not contain a '/' (got '$REGISTRY_IN'); use the owner input to set the org"
+            exit 1
+          fi
+          if [[ "$OWNER_IN" == */* ]]; then
+            echo "::error::owner must not contain a '/' (got '$OWNER_IN'); use the namespace input for sub-paths"
+            exit 1
+          fi
+          if [ -z "$OWNER_IN" ]; then
+            echo "::error::owner is required when a registry is given"
+            exit 1
+          fi
+          registry="$REGISTRY_IN/$OWNER_IN"
+          if [ -n "$NAMESPACE_IN" ]; then
+            registry="$registry/$NAMESPACE_IN"
+          fi
+        fi
+        echo "Registry: $registry"
+        echo "registry=$registry" >> "$GITHUB_OUTPUT"
