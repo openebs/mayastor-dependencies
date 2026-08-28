@@ -22,6 +22,8 @@ message MayastorFeatures {
   // Support for nexus label version via create_nexus2.
   // This returns the latest version supported.
   uint32 nexus_label_version = 6;
+  // The io-engine gRPC server has TLS enabled and expects TLS connections.
+  optional bool grpcTls = 7;
 }
 
 message MayastorBugFixes {
