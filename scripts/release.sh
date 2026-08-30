@@ -53,6 +53,20 @@ get_hash() {
   vers=$(git rev-parse --short=12 HEAD)
   echo -n "$vers"
 }
+# Get the container image architecture name for the host
+image_arch() {
+  case "$(uname -m)" in
+    x86_64)
+      echo -n "amd64"
+      ;;
+    aarch64|arm64)
+      echo -n "arm64"
+      ;;
+    *)
+      log_fatal "Unsupported host architecture: $(uname -m)"
+      ;;
+  esac
+}
 nix_experimental() {
   if (nix eval 2>&1 || true) | grep "extra-experimental-features" 1>/dev/null; then
       echo -n " --extra-experimental-features nix-command "
@@ -188,6 +202,8 @@ parse_common_arg() {
       RM="echo $RM"
       TAR="echo $TAR"
       HELM="echo $HELM"
+      PODMAN="echo $PODMAN"
+      DRY_RUN="yes"
       shift
       ;;
     --registry)
@@ -198,6 +214,22 @@ parse_common_arg() {
     --alias-tag)
       shift
       ALIAS=$1
+      shift
+      ;;
+    --image-out)
+      shift
+      validate_arg "Image output directory" "${1:-}"
+      # Keep the built image archives in "<dir>/<arch>/" instead of loading
+      # and publishing them, to be pushed later through --manifest-tars.
+      IMAGE_OUT_DIR=$1
+      SKIP_PUBLISH="yes"
+      CONTAINER_LOAD=
+      shift
+      ;;
+    --manifest-tars)
+      shift
+      validate_arg "Manifest tars directory" "${1:-}"
+      MANIFEST_TARS=$1
       shift
       ;;
     --tag)
@@ -353,11 +385,21 @@ cache_deps() {
 
 skopeo_check() {
   # Currently skopeo is only used for this
-  if [ -n "$CONTAINER_LOAD" ]; then
+  if [ -n "$CONTAINER_LOAD" ] || [ -n "$IMAGE_OUT_DIR" ]; then
     return
   fi
   if ! binary_check "$SKOPEO"; then
     SKOPEO=$(fetch_nix_bin "skopeo" "skopeo")
+  fi
+}
+
+podman_check() {
+  # Currently podman is only used to assemble and push the multi-arch manifests
+  if [ -z "$MANIFEST_TARS" ] || [ -n "$DRY_RUN" ]; then
+    return
+  fi
+  if ! binary_check "$PODMAN"; then
+    PODMAN=$(fetch_nix_bin "podman" "podman")
   fi
 }
 
@@ -416,30 +458,43 @@ build_helm_deps() {
   helm_dep_update "${HELM_CHART_DIR%/}"
 }
 
+# Prefix the image name with the registry, if set
+registry_image_name() {
+  local image=$1
+
+  if [ -n "$REGISTRY" ]; then
+    if [[ "$REGISTRY" =~ '/' ]]; then
+      image="$REGISTRY/$(echo "$image" | cut -d'/' -f2)"
+    else
+      image="$REGISTRY/$image"
+    fi
+  fi
+
+  echo -n "$image"
+}
+
 build_images() {
+  local out_dir="."
+  if [ -n "$IMAGE_OUT_DIR" ]; then
+    out_dir="$IMAGE_OUT_DIR/$(image_arch)"
+    mkdir -p "$out_dir"
+  fi
+
   for name in $IMAGES; do
     image_basename=$($NIX_EVAL -f . "images.$BUILD_TYPE.$name.imageName" --raw --quiet --argstr product_prefix "$PRODUCT_PREFIX")
-    image=$image_basename
+    image=$(registry_image_name "$image_basename")
     archive=$name
 
-    if [ -n "$REGISTRY" ]; then
-      if [[ "$REGISTRY" =~ '/' ]]; then
-        image="$REGISTRY/$(echo "$image" | cut -d'/' -f2)"
-      else
-        image="$REGISTRY/$image"
-      fi
-    fi
-
     UPLOAD_NAMES+=("$image")
-    UPLOAD_TARS+=("$(realpath -s "$archive-image")")
+    UPLOAD_TARS+=("$(realpath -s "$out_dir/$archive-image")")
 
     # If we're skipping the build, then we just want to upload
     # the images we already have locally.
     if [ -z "$SKIP_BUILD" ]; then
       echo "Building $image:$TAG ..."
-      $NIX_BUILD --out-link "$archive-image" -A "images.$BUILD_TYPE.$archive" --arg allInOne "$ALL_IN_ONE" --arg incremental "$INCREMENTAL" --argstr product_prefix "$PRODUCT_PREFIX" --argstr rustFlags "$RUSTFLAGS"
+      $NIX_BUILD --out-link "$out_dir/$archive-image" -A "images.$BUILD_TYPE.$archive" --arg allInOne "$ALL_IN_ONE" --arg incremental "$INCREMENTAL" --argstr product_prefix "$PRODUCT_PREFIX" --argstr rustFlags "$RUSTFLAGS"
       if [ -n "$CONTAINER_LOAD" ]; then
-        container_load "$archive-image"
+        container_load "$out_dir/$archive-image"
         if [ "$image" != "$image_basename" ]; then
           echo "Renaming $image_basename:$TAG to $image:$TAG"
           $DOCKER tag "${image_basename}:$TAG" "$image:$TAG"
@@ -530,8 +585,57 @@ upload_images() {
 }
 
 cleanup_tars() {
+  # The image archives are kept for a later --manifest-tars push
+  if [ -n "$IMAGE_OUT_DIR" ]; then
+    return 0
+  fi
   for tar in "${UPLOAD_TARS[@]}"; do
     $RM -f "$tar"
+  done
+}
+
+# Assemble and push multi-arch manifest lists (tagged $TAG and $ALIAS_TAG) from the per-arch
+# image archives found in "$MANIFEST_TARS/<arch>/<name>-image", as produced by --image-out.
+# The arch images are pushed untagged (addressed by digest) along with the manifest list.
+create_manifests() {
+  if [ -n "$SKIP_PUBLISH" ]; then
+    echo "Skipping the manifest creation ..."
+    return 0
+  fi
+
+  for name in $IMAGES; do
+    image_basename=$($NIX_EVAL -f . "images.$BUILD_TYPE.$name.imageName" --raw --quiet --argstr product_prefix "$PRODUCT_PREFIX")
+    image=$(registry_image_name "$image_basename")
+    list="localhost/$name-manifest"
+
+    $PODMAN manifest rm "$list" &>/dev/null || true
+    $PODMAN manifest create "$list"
+
+    # podman reads the archives lazily, only when the manifest is pushed, so the
+    # decompressed tars must be kept around until after the push.
+    tars=()
+    for tar in "$MANIFEST_TARS"/*/"$name-image"; do
+      if [ ! -f "$tar" ]; then
+        log_fatal "No image archives found for image $name in $MANIFEST_TARS"
+      fi
+      # podman can't read compressed docker archives
+      if [ -n "$DRY_RUN" ]; then
+        echo "$ZCAT $tar > $tar.tar"
+      else
+        $ZCAT "$tar" > "$tar.tar"
+      fi
+      tars+=("$tar.tar")
+      echo "Adding $tar to the $image manifest ..."
+      $PODMAN manifest add "$list" docker-archive:"$tar.tar"
+    done
+
+    for tag in $TAG $ALIAS_TAG; do
+      echo "Pushing manifest $image:$tag ..."
+      $PODMAN manifest push --all "$list" docker://"$image:$tag"
+    done
+
+    $PODMAN manifest rm "$list"
+    $RM "${tars[@]}"
   done
 }
 
@@ -601,7 +705,13 @@ get_parent() {
 common_run() {
   parse_common_args $@
   skopeo_check
+  podman_check
   setup
+
+  if [ -n "$MANIFEST_TARS" ]; then
+    create_manifests
+    return 0
+  fi
 
   cache_deps
 
@@ -627,6 +737,12 @@ common_help() {
   --skip-images              Don't build nor upload any images.
   --alias-tag       <tag>    Explicit alias for short commit hash tag.
   --tag             <tag>    Explicit tag (overrides the git tag).
+  --image-out       <dir>    Keep the built image archives in "<dir>/<arch>/" instead of
+                             loading and publishing them (implies --skip-publish), to be
+                             pushed later through --manifest-tars.
+  --manifest-tars   <dir>    Assemble and push multi-arch manifest lists from the per-arch image
+                             archives kept by previous --image-out runs (skips building).
+                             The arch images are pushed untagged, addressed only by digest.
   --incremental              Builds components in two stages allowing for faster rebuilds during development.
   --build-bins               Builds all the static binaries.
   --no-static-linking        Don't build the binaries with static linking.
@@ -671,6 +787,10 @@ SKIP_BUILD=
 OVERRIDE_COMMIT_HASH=
 REGISTRY=
 ALIAS=
+IMAGE_OUT_DIR=
+MANIFEST_TARS=
+PODMAN="podman"
+DRY_RUN=
 BUILD_TYPE="release"
 ALL_IN_ONE="true"
 INCREMENTAL="false"

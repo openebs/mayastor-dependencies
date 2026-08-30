@@ -1,0 +1,50 @@
+name: 'Build Container Images'
+description: >-
+  Nix-build the container images for the host architecture and upload them
+  as a workflow artifact, to be pushed later by the image-manifest-push action.
+inputs:
+  tag:
+    description: 'Explicit tag for the images (overrides the git tag)'
+    default: ''
+  registry:
+    description: 'Registry (and optionally org) to prefix the image names with'
+    default: ''
+  script:
+    description: 'Path to the release script'
+    default: './scripts/release.sh'
+  artifact-prefix:
+    description: 'Prefix for the uploaded image artifact name'
+    default: 'images'
+runs:
+  using: composite
+  steps:
+    - name: Fetch the annotated tag
+      if: github.ref_type == 'tag'
+      shell: bash
+      run: |
+        # BUG: HEAD tag is fetched as lightweight instead of annotated
+        # https://github.com/actions/checkout/issues/290
+        git fetch -f origin ${{ github.ref }}:${{ github.ref }}
+    - uses: cachix/install-nix-action@v31.11.0
+    - name: Build the release images
+      shell: bash
+      env:
+        IMG_TAG: ${{ inputs.tag }}
+        IMG_REGISTRY: ${{ inputs.registry }}
+        RELEASE_SCRIPT: ${{ inputs.script }}
+      run: |
+        args=(--image-out images)
+        if [ -n "$IMG_TAG" ]; then
+          args+=(--tag "$IMG_TAG")
+        fi
+        if [ -n "$IMG_REGISTRY" ]; then
+          args+=(--registry "$IMG_REGISTRY")
+        fi
+        "$RELEASE_SCRIPT" "${args[@]}"
+    - name: Upload the image archives
+      uses: actions/upload-artifact@v6
+      with:
+        name: ${{ inputs.artifact-prefix }}-${{ runner.arch }}
+        path: images/
+        retention-days: 1
+        if-no-files-found: error
