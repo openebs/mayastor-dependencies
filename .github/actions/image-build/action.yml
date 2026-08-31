@@ -15,6 +15,15 @@ inputs:
   artifact-prefix:
     description: 'Prefix for the uploaded image artifact name'
     default: 'images'
+  sbom:
+    description: >-
+      Generate a CycloneDX SBOM per image. Scanned natively on this runner, so it
+      describes this architecture, and written beside the image archives for the
+      manifest push to attest each arch with its own.
+    default: 'false'
+  sbom-artifact-prefix:
+    description: 'Prefix for the uploaded SBOM artifact name'
+    default: 'sbom'
 runs:
   using: composite
   steps:
@@ -31,9 +40,13 @@ runs:
       env:
         IMG_TAG: ${{ inputs.tag }}
         IMG_REGISTRY: ${{ inputs.registry }}
+        IMG_SBOM: ${{ inputs.sbom }}
         RELEASE_SCRIPT: ${{ inputs.script }}
       run: |
         args=(--image-out images)
+        if [ "$IMG_SBOM" = "true" ]; then
+          args+=(--sbom)
+        fi
         if [ -n "$IMG_TAG" ]; then
           args+=(--tag "$IMG_TAG")
         fi
@@ -47,4 +60,13 @@ runs:
         name: ${{ inputs.artifact-prefix }}-${{ runner.arch }}
         path: images/
         retention-days: 1
+        if-no-files-found: error
+    # Also on their own, since the image archives above are dropped after a day
+    # while the SBOMs are worth keeping for the default retention.
+    - name: Upload the SBOMs
+      if: inputs.sbom == 'true'
+      uses: actions/upload-artifact@v6
+      with:
+        name: ${{ inputs.sbom-artifact-prefix }}-${{ runner.arch }}
+        path: images/*/*.cdx.json
         if-no-files-found: error
