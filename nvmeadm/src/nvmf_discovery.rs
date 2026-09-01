@@ -53,18 +53,13 @@ static HOST_INFO: once_cell::sync::Lazy<HostInfo> = once_cell::sync::Lazy::new(|
 });
 
 /// The TrType struct for all known transports types note: we are missing loop
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Primitive)]
+#[derive(Default, Clone, Copy, Debug, Eq, PartialEq, Primitive)]
 #[allow(non_camel_case_types)]
 pub enum TrType {
     rdma = 1,
     fc = 2,
+    #[default]
     tcp = 3,
-}
-
-impl Default for TrType {
-    fn default() -> Self {
-        Self::tcp
-    }
 }
 
 impl fmt::Display for TrType {

@@ -21,6 +21,7 @@ pub trait Bus {
 pub mod event {
     #![allow(clippy::derive_partial_eq_without_eq)]
     #![allow(clippy::large_enum_variant)]
+    #![allow(clippy::useless_borrows_in_formatting)]
     tonic::include_proto!("v1.event");
     include!(concat!(env!("OUT_DIR"), "/v1.event.serde.rs"));
 }

@@ -261,18 +261,15 @@ const RUST_LOG_DEFAULT: &str =
     "debug,actix_web=debug,actix=debug,h2=info,hyper=info,tower_buffer=info,tower=info,bollard=info,rustls=info,reqwest=info,composer=info";
 
 /// Policy for when to pull images when creating the container.
-#[derive(Clone, Debug)]
+#[derive(Default, Clone, Debug)]
 pub enum ImagePullPolicy {
     /// Only pull if the image is not cached locally.
+    #[default]
     IfNotPresent,
     /// Always pull when starting a container, if the locally cached image is not up to date.
     Always,
 }
-impl Default for ImagePullPolicy {
-    fn default() -> Self {
-        Self::IfNotPresent
-    }
-}
+
 impl std::str::FromStr for ImagePullPolicy {
     type Err = String;
     fn from_str(source: &str) -> Result<Self, Self::Err> {
