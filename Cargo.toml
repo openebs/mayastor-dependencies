@@ -43,13 +43,14 @@ url = "2.5.4"
 uuid = { version = "1.4.1", features = ["v4"] }
 chrono = "0.4.38"
 glob = "0.3.1"
+regex = "1.11.1"
 
 strum = "0.26.3"
 strum_macros = "0.26.4"
 heck = "0.5.0"
 
-tonic = "0.12.3"
-tonic-build = "0.12.3"
+tonic = "0.13.1"
+tonic-build = "0.13.1"
 prost-types = "0.13.3"
 prost = "0.13.2"
 prost-derive = "0.13.3"
