@@ -5,7 +5,7 @@ edition = "2018"
 
 [dependencies]
 git-version-macro = { path = "../git-version-macro" }
-regex = "1"
+regex = { workspace = true }
 
 [features]
 default = ["deps"]
