@@ -69,6 +69,10 @@ message CreateReplicaRequest {
   ShareProtocol share = 6;  // protocol to expose the replica over
   repeated string allowed_hosts = 7; // host (nqn's) which are allowed to connect to the target.
   optional string entity_id = 8; // entity which owns the replica, if any
+  // Backend-specific replica creation properties (e.g. zfs volblocksize,
+  // compression). Backends reject unknown keys; backends without property
+  // support reject any non-empty map.
+  map<string, string> properties = 9;
 }
 
 // Destroy replica arguments.
