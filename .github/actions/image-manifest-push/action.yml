@@ -24,6 +24,13 @@ inputs:
   ghcr-token:
     description: 'Token to login to ghcr.io with'
     default: ''
+  attest:
+    description: >-
+      Sign the pushed manifest lists and attach each architecture's SBOM as an
+      in-toto attestation. Signing is keyless, so the calling job needs
+      "permissions: id-token: write", and the per-arch SBOMs must have been built
+      by image-build with sbom enabled.
+    default: 'false'
 runs:
   using: composite
   steps:
@@ -59,9 +66,13 @@ runs:
       env:
         IMG_TAG: ${{ inputs.tag }}
         IMG_REGISTRY: ${{ inputs.registry }}
+        IMG_ATTEST: ${{ inputs.attest }}
         RELEASE_SCRIPT: ${{ inputs.script }}
       run: |
         args=(--manifest-tars images)
+        if [ "$IMG_ATTEST" = "true" ]; then
+          args+=(--attest)
+        fi
         if [ -n "$IMG_TAG" ]; then
           args+=(--tag "$IMG_TAG")
         fi

@@ -15,7 +15,7 @@ SOURCE=""
 TARGET=""
 TAG=""
 
-# --- Parse arguments --- 
+# --- Parse arguments ---
 for ((i=1; i <= $#; i++)); do
   case "${!i}" in
     --chart)
@@ -42,8 +42,8 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --chart)
-      CHART_REPO="$2"; 
-      shift 2 
+      CHART_REPO="$2";
+      shift 2
       ;;
     *)
       log_fatal "Unknown option: $1"
@@ -88,6 +88,14 @@ for IMAGE in "${IMAGES[@]}"; do
   SRC="${SOURCE}/${IMAGE}:${TAG}"
   DEST="${TARGET}/${IMAGE}:${TAG}"
   crane copy --platform all "${SRC}" "${DEST}"
+
+  # The signature and the SBOM attestations are attached as OCI 1.1 referrers of
+  # the manifest list and of each per-arch manifest within it. Referrers aren't
+  # reachable from the manifest, so crane leaves them behind; oras walks the
+  # referrer graph. The image blobs are already at the target by now, so this
+  # only moves what's missing.
+  echo "Mirroring the referrers of ${IMAGE}:${TAG}..."
+  oras cp --recursive "${SRC}" "${DEST}"
 
   echo "Successfully mirrored ${IMAGE}:${TAG}"
 done

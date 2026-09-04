@@ -314,6 +314,46 @@ parse_common_arg() {
       HELM_DEP_UPDATE="true"
       shift
       ;;
+    --sbom)
+      SBOM="yes"
+      shift
+      ;;
+    --sbom-out)
+      shift
+      validate_arg "SBOM output directory" "${1:-}"
+      SBOM_OUT="$1"
+      shift
+      ;;
+    --insecure-registry)
+      INSECURE_REGISTRY="yes"
+      shift
+      ;;
+    --cosign-key)
+      shift
+      validate_arg "Cosign key" "${1:-}"
+      COSIGN_KEY="$1"
+      shift
+      ;;
+    --tlog-upload)
+      TLOG_UPLOAD="true"
+      shift
+      ;;
+    --no-tlog-upload)
+      TLOG_UPLOAD="false"
+      shift
+      ;;
+    --force-attest)
+      FORCE_ATTEST="yes"
+      ATTEST="yes"
+      SBOM="yes"
+      shift
+      ;;
+    --attest)
+      ATTEST="yes"
+      # There's nothing to attest without an SBOM to attest to.
+      SBOM="yes"
+      shift
+      ;;
     *)
       echo "Unknown option: $1"
       exit 1
@@ -384,8 +424,9 @@ cache_deps() {
 }
 
 skopeo_check() {
-  # Currently skopeo is only used for this
-  if [ -n "$CONTAINER_LOAD" ] || [ -n "$IMAGE_OUT_DIR" ]; then
+  # skopeo copies the images to the registry, and resolves the digests of what
+  # we've pushed so that the signatures and attestations can be bound to them.
+  if [ -z "$ATTEST" ] && { [ -n "$CONTAINER_LOAD" ] || [ -n "$IMAGE_OUT_DIR" ]; }; then
     return
   fi
   if ! binary_check "$SKOPEO"; then
@@ -400,6 +441,39 @@ podman_check() {
   fi
   if ! binary_check "$PODMAN"; then
     PODMAN=$(fetch_nix_bin "podman" "podman")
+  fi
+}
+
+sbom_check() {
+  if [ -z "$SBOM" ]; then
+    return
+  fi
+  if ! binary_check "$SYFT"; then
+    SYFT=$(fetch_nix_bin "syft" "syft")
+  fi
+}
+
+cosign_check() {
+  if [ -z "$ATTEST" ]; then
+    return
+  fi
+  if ! binary_check "$COSIGN" "version"; then
+    COSIGN=$(fetch_nix_bin "cosign" "cosign")
+  fi
+  # Used to pick the per-arch manifests out of a pushed manifest list, and to
+  # look for artifacts already attached to an image.
+  if ! binary_check "$JQ"; then
+    JQ=$(fetch_nix_bin "jq" "jq")
+  fi
+  if ! binary_check "$ORAS" "version"; then
+    ORAS=$(fetch_nix_bin "oras" "oras")
+  fi
+  # Signing a local registry is a test, and keyless signing is almost certainly
+  # not what's wanted for one: it authenticates interactively through a browser
+  # and puts the identity it authenticated as in a permanent public record.
+  if [ -n "$INSECURE_REGISTRY" ] && [ -z "$COSIGN_KEY" ]; then
+    log_warn "Signing keyless: cosign will ask to authenticate through a browser."
+    log_warn "Pass --cosign-key to sign with a key pair instead."
   fi
 }
 
@@ -473,6 +547,288 @@ registry_image_name() {
   echo -n "$image"
 }
 
+# Generate the SBOM for the given image, from the image itself rather than from
+# its nix closure: that picks up dependencies vendored into a single derivation
+# (rust crates, say), which a closure scan cannot see, and it describes what is
+# actually in the layers rather than what the image was built from.
+#
+# With --image-out the SBOM is written next to the image archive, under
+# "<dir>/<arch>/", so that each architecture is scanned natively on its own
+# runner and the manifest push can later attest each arch with its own SBOM.
+build_image_sbom() {
+  local name=$1
+  local ref=$2
+  local archive=$3
+  local out="$(sbom_dir)/$name"
+
+  mkdir -p "$(sbom_dir)"
+  echo "Generating SBOM for $name ..."
+
+  if [ -n "$DRY_RUN" ]; then
+    echo "$SYFT scan <$name image> -o cyclonedx-json=$out.cdx.json"
+    return
+  fi
+
+  if [ -n "$CONTAINER_LOAD" ]; then
+    # Just loaded into the container service, so scan it there rather than
+    # unpacking the archive again.
+    $SYFT scan "docker:$ref:$TAG" -o cyclonedx-json="$out.cdx.json" -q
+    return
+  fi
+
+  # syft reads a docker archive, but not the compressed one nix produces.
+  $ZCAT "$archive" > "$archive.tar"
+  $SYFT scan "docker-archive:$archive.tar" -o cyclonedx-json="$out.cdx.json" -q
+  $RM -f "$archive.tar"
+}
+
+# Where the SBOMs are written: alongside the per-arch image archives when those
+# are being kept, so they travel together to the manifest push.
+sbom_dir() {
+  if [ -n "$IMAGE_OUT_DIR" ]; then
+    echo -n "$IMAGE_OUT_DIR/$(image_arch)"
+  else
+    echo -n "$SBOM_OUT"
+  fi
+}
+
+# Resolve the digest of the manifest at the given reference. We sign and attest
+# digests rather than tags, since a tag is mutable. For a manifest list this is
+# the digest of the list itself.
+image_digest() {
+  $SKOPEO inspect ${INSECURE_REGISTRY:+--tls-verify=false} --no-tags --format '{{.Digest}}' "docker://$1"
+}
+
+# List "<arch> <digest>" for each linux image within the manifest list at the
+# given reference.
+manifest_children() {
+  $SKOPEO inspect ${INSECURE_REGISTRY:+--tls-verify=false} --raw "docker://$1" \
+    | $JQ -r '.manifests[]? | select(.platform.os == "linux" and .platform.architecture != "unknown") | "\(.platform.architecture) \(.digest)"'
+}
+
+# Whether the signing events should go to the public transparency log.
+#
+# Uploaded by default, as cosign does: for keyless signing the Rekor entry is
+# what proves the signature was made while the short-lived certificate was still
+# valid, so without it "cosign verify" needs --insecure-ignore-tlog. The default
+# is flipped for --insecure-registry, since signing a local registry for a test
+# has no business in a permanent public log. --tlog-upload/--no-tlog-upload
+# override either way.
+tlog_upload() {
+  if [ -n "$TLOG_UPLOAD" ]; then
+    echo -n "$TLOG_UPLOAD"
+  elif [ -n "$INSECURE_REGISTRY" ]; then
+    echo -n "false"
+  else
+    echo -n "true"
+  fi
+}
+
+# Add the arguments which attach the attestation as a sigstore bundle, to the
+# named array.
+#
+# cosign 2 needs --new-bundle-format for that; cosign 3 does it by default, has
+# deprecated the flag and dropped it from its help, so it is probed for rather
+# than passed unconditionally - both to avoid the deprecation warning and
+# because the flag will eventually be removed.
+bundle_args() {
+  local -n out=$1
+
+  if [ -z "$COSIGN_BUNDLE_FLAG" ]; then
+    if $COSIGN attest --help 2>/dev/null | grep -q -- "--new-bundle-format"; then
+      COSIGN_BUNDLE_FLAG="yes"
+    else
+      COSIGN_BUNDLE_FLAG="no"
+    fi
+  fi
+  if [ "$COSIGN_BUNDLE_FLAG" = "yes" ]; then
+    out+=(--new-bundle-format)
+  fi
+}
+
+# Add the arguments which stop a signing event from being recorded in the
+# transparency log, to the named array.
+#
+# cosign 3 deprecated --tlog-upload in favour of a signing config listing the
+# services to use, so there it is given one with no transparency log. The config
+# is created from scratch rather than fetched, so this stays offline. cosign 2
+# has no such thing and takes the flag. Probed for rather than matched on the
+# version.
+no_tlog_args() {
+  local -n out=$1
+
+  if [ -z "$COSIGN_SIGNING_CONFIG" ]; then
+    if $COSIGN sign --help 2>/dev/null | grep -q -- "--signing-config="; then
+      if [ -n "$DRY_RUN" ]; then
+        COSIGN_SIGNING_CONFIG="<no-tlog signing config>"
+      else
+        COSIGN_SIGNING_CONFIG=$(mktemp -t cosign-no-tlog-XXXXXX.json)
+        $COSIGN signing-config create --out "$COSIGN_SIGNING_CONFIG" 1>/dev/null
+      fi
+    else
+      COSIGN_SIGNING_CONFIG="none"
+    fi
+  fi
+  if [ "$COSIGN_SIGNING_CONFIG" = "none" ]; then
+    out+=(--tlog-upload=false)
+  else
+    out+=(--signing-config "$COSIGN_SIGNING_CONFIG")
+  fi
+}
+
+# Whether anything is already attached to the given digest reference, ie whether
+# it has been signed and attested before.
+#
+# cosign attaches both as referrers and cannot replace them: --replace only ever
+# applied to the older tag layout - it is a no-op for these, measurably - and
+# cosign 3 dropped the flag. So signing an unchanged digest again just leaves
+# duplicates behind, and a re-run of an already published tag skips instead.
+already_signed() {
+  if [ -n "$FORCE_ATTEST" ]; then
+    return 1
+  fi
+  $ORAS discover ${INSECURE_REGISTRY:+--plain-http} --format json "$1" 2>/dev/null \
+    | $JQ -e '(.manifests // []) | length > 0' 1>/dev/null 2>&1
+}
+
+# Sign the given digest reference. Any extra arguments go to cosign sign.
+#
+# The signature is attached as an OCI 1.1 referrer rather than as a
+# "sha256-<digest>.sig" tag. Note that verifying it then needs
+# "cosign verify --experimental-oci11"; without that cosign looks for the legacy
+# tag and reports "no signatures found", which looks just like an unsigned image.
+sign_ref() {
+  local ref=$1
+  shift
+  local args=(--registry-referrers-mode oci-1-1 "$@")
+
+  if [ -n "$INSECURE_REGISTRY" ]; then
+    args+=(--allow-insecure-registry)
+  fi
+  if [ "$(tlog_upload)" = "false" ]; then
+    no_tlog_args args
+  fi
+  if [ -n "$COSIGN_KEY" ]; then
+    args+=(--key "$COSIGN_KEY")
+  fi
+
+  if [ -n "$DRY_RUN" ]; then
+    echo "COSIGN_EXPERIMENTAL=1 $COSIGN sign --yes ${args[*]} $ref"
+    return
+  fi
+
+  echo "Signing $ref ..."
+  # COSIGN_EXPERIMENTAL is what gates the oci-1-1 referrers mode, as of cosign
+  # 3.1.3; "attest --new-bundle-format" below does not need it.
+  COSIGN_EXPERIMENTAL=1 $COSIGN sign --yes "${args[@]}" "$ref"
+}
+
+# Attach the given SBOM to the reference as an in-toto attestation, as a sigstore
+# bundle - which lands as an OCI 1.1 referrer, and is verified with
+# "cosign verify-attestation --new-bundle-format" (NOT --experimental-oci11,
+# which is parsed but never reaches attestation verification, see
+# sigstore/cosign#4708).
+attest_ref() {
+  local ref=$1
+  local sbom=$2
+  local args=()
+
+  bundle_args args
+
+  if [ -n "$INSECURE_REGISTRY" ]; then
+    args+=(--allow-insecure-registry)
+  fi
+  if [ "$(tlog_upload)" = "false" ]; then
+    no_tlog_args args
+  fi
+  if [ -n "$COSIGN_KEY" ]; then
+    args+=(--key "$COSIGN_KEY")
+  fi
+
+  if [ -n "$DRY_RUN" ]; then
+    echo "$COSIGN attest --yes ${args[*]} --type cyclonedx --predicate $sbom $ref"
+    return
+  fi
+
+  if [ ! -f "$sbom" ]; then
+    log_fatal "Missing SBOM $sbom, can't attest $ref"
+  fi
+  echo "Attesting the SBOM of $ref ..."
+  $COSIGN attest --yes "${args[@]}" --type cyclonedx --predicate "$sbom" "$ref"
+}
+
+# Sign a single-architecture image and attach its SBOM.
+attest_image() {
+  local img=$1
+  local tag=$2
+  local sbom=$3
+
+  if [ -n "$DRY_RUN" ]; then
+    sign_ref "$img:$tag"
+    attest_ref "$img:$tag" "$sbom"
+    return
+  fi
+
+  local digest
+  digest=$(image_digest "$img:$tag") || log_fatal "Failed to resolve the digest of $img:$tag"
+  if [ -z "$digest" ]; then
+    log_fatal "Empty digest for $img:$tag"
+  fi
+
+  if already_signed "$img@$digest"; then
+    echo "Skipping $img@$digest which is already signed"
+    return
+  fi
+
+  sign_ref "$img@$digest"
+  attest_ref "$img@$digest" "$sbom"
+}
+
+# Sign a pushed manifest list and attach the per-arch SBOMs.
+#
+# The list is signed with --recursive so that each architecture's manifest is
+# signed too and can be verified on its own digest. The SBOMs, however, are
+# attached per architecture rather than to the list: each one describes only the
+# arch it was scanned on, so attesting the list with any single one of them would
+# claim contents that were never scanned.
+attest_manifest() {
+  local img=$1
+  local tag=$2
+  local name=$3
+
+  if [ -n "$DRY_RUN" ]; then
+    sign_ref "$img:$tag" -r
+    attest_ref "$img@<per-arch digest>" "<per-arch sbom>"
+    return
+  fi
+
+  local digest
+  digest=$(image_digest "$img:$tag") || log_fatal "Failed to resolve the digest of $img:$tag"
+  if [ -z "$digest" ]; then
+    log_fatal "Empty digest for $img:$tag"
+  fi
+
+  if already_signed "$img@$digest"; then
+    echo "Skipping $img@$digest which is already signed"
+    return
+  fi
+
+  sign_ref "$img@$digest" -r
+
+  local arch child found=
+  while read -r arch child; do
+    if [ -z "$arch" ]; then
+      continue
+    fi
+    found="y"
+    attest_ref "$img@$child" "$MANIFEST_TARS/$arch/$name.cdx.json"
+  done < <(manifest_children "$img:$tag")
+
+  if [ -z "$found" ]; then
+    log_fatal "No per-arch manifests found in $img:$tag, nothing to attest"
+  fi
+}
+
 build_images() {
   local out_dir="."
   if [ -n "$IMAGE_OUT_DIR" ]; then
@@ -487,6 +843,7 @@ build_images() {
 
     UPLOAD_NAMES+=("$image")
     UPLOAD_TARS+=("$(realpath -s "$out_dir/$archive-image")")
+    UPLOAD_SBOMS+=("$(sbom_dir)/$archive.cdx.json")
 
     # If we're skipping the build, then we just want to upload
     # the images we already have locally.
@@ -501,6 +858,12 @@ build_images() {
           $DOCKER image rm "${image_basename}:$TAG"
         fi
       fi
+    fi
+
+    # After the image rather than before: it's scanned off the built image, which
+    # by now is either loaded into the container service or sitting in $out_dir.
+    if [ -n "$SBOM" ]; then
+      build_image_sbom "$archive" "$image" "$(realpath -s "$out_dir/$archive-image")"
     fi
   done
 }
@@ -558,8 +921,8 @@ upload_image() {
 }
 
 upload_images() {
-  # sanity check both arrays, just in case...
-  if [ "${#UPLOAD_NAMES[*]}" != "${#UPLOAD_TARS[*]}" ]; then
+  # sanity check the arrays, just in case...
+  if [ "${#UPLOAD_NAMES[*]}" != "${#UPLOAD_TARS[*]}" ] || [ "${#UPLOAD_NAMES[*]}" != "${#UPLOAD_SBOMS[*]}" ]; then
     log_fatal "Upload image names array doesn't match the image tar archives"
   fi
 
@@ -570,18 +933,33 @@ upload_images() {
 
       # Should this be an override instead?
       if [[ -n "$CI" && ! "$TAG" =~ -(develop|prerelease)$ ]] && dockerhub_tag_exists "$img" "$TAG"; then
-        echo "Skipping $img:$TAG which already exists"
-        continue
+        echo "Skipping the upload of $img:$TAG which already exists"
+      else
+        upload_image "$img" "$TAG" "$tar"
+        if [ -n "$ALIAS_TAG" ]; then
+          upload_image_alias "$img" "$TAG" "$ALIAS_TAG" "$tar"
+        fi
       fi
 
-      upload_image "$img" "$TAG" "$tar"
-      if [ -n "$ALIAS_TAG" ]; then
-        upload_image_alias "$img" "$TAG" "$ALIAS_TAG" "$tar"
+      # Deliberately outside the upload: an image already in the registry still
+      # needs its signature and SBOM, and skipping the push is no reason to leave
+      # it unsigned. The alias points at the same manifest and cosign attaches to
+      # the digest, so attesting once covers every tag of this image.
+      if [ -n "$ATTEST" ]; then
+        attest_image "$img" "$TAG" "${UPLOAD_SBOMS[$i]}"
       fi
     done
   fi
 
   $DOCKER image prune -f
+}
+
+cleanup() {
+  # A real temp file even under --dry-run's echo'd $RM, so remove it directly.
+  if [ -f "$COSIGN_SIGNING_CONFIG" ]; then
+    rm -f "$COSIGN_SIGNING_CONFIG"
+  fi
+  cleanup_tars
 }
 
 cleanup_tars() {
@@ -633,6 +1011,12 @@ create_manifests() {
       echo "Pushing manifest $image:$tag ..."
       $PODMAN manifest push --all "$list" docker://"$image:$tag"
     done
+
+    # Once only: the alias list has the same digest, and cosign attaches to
+    # digests rather than tags.
+    if [ -n "$ATTEST" ]; then
+      attest_manifest "$image" "$TAG" "$name"
+    fi
 
     $PODMAN manifest rm "$list"
     $RM "${tars[@]}"
@@ -706,6 +1090,8 @@ common_run() {
   parse_common_args $@
   skopeo_check
   podman_check
+  sbom_check
+  cosign_check
   setup
 
   if [ -n "$MANIFEST_TARS" ]; then
@@ -752,9 +1138,30 @@ common_help() {
   --skopeo-copy              Don't load containers into host, simply copy them to registry with skopeo.
   --skip-cargo-deps          Don't prefetch the cargo build dependencies.
   --helm-update              Force update helm dependencies.
+  --sbom                     Generate a CycloneDX SBOM per image, with syft.
+  --sbom-out        <path>   Directory to write the SBOMs to (default: ./sbom).
+                             Ignored with --image-out, which keeps them beside
+                             the per-arch image archives.
+  --attest                   Sign the pushed images and attach their SBOM as an
+                             in-toto attestation. Implies --sbom.
+  --force-attest             Sign and attest even if the image is signed already,
+                             leaving what is already attached in place. Implies
+                             --attest.
+  --insecure-registry        Talk to the registry over plain HTTP, for testing
+                             against a local registry. Also stops the signatures
+                             from being recorded in the public transparency log.
+  --cosign-key      <path>   Sign with this cosign key rather than keyless, which
+                             avoids cosign authenticating through a browser.
+                             Defaults to \$COSIGN_KEY.
+  --tlog-upload              Record the signatures in the public transparency log
+                             even when --insecure-registry is given.
+  --no-tlog-upload           Never record the signatures in the public
+                             transparency log. Note that verifying a keyless
+                             signature then needs --insecure-ignore-tlog.
 
 Environment Variables:
   RUSTFLAGS                  Set Rust compiler options when building binaries.
+  COSIGN_KEY                 Default for --cosign-key.
 EOF
 }
 
@@ -769,6 +1176,9 @@ TAR="tar"
 HELM="helm"
 CURL="curl"
 SKOPEO="skopeo"
+ORAS="oras"
+SYFT="syft"
+COSIGN="cosign"
 ZCAT="zcat"
 SEMVER="semver"
 YQ="yq"
@@ -782,7 +1192,17 @@ GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 BRANCH=${GIT_BRANCH////-}
 UPLOAD_NAMES=()
 UPLOAD_TARS=()
+UPLOAD_SBOMS=()
 SKIP_PUBLISH=
+SBOM=
+SBOM_OUT="sbom"
+ATTEST=
+INSECURE_REGISTRY=
+FORCE_ATTEST=
+TLOG_UPLOAD=
+COSIGN_KEY=${COSIGN_KEY:-}
+COSIGN_SIGNING_CONFIG=
+COSIGN_BUNDLE_FLAG=
 SKIP_BUILD=
 OVERRIDE_COMMIT_HASH=
 REGISTRY=
@@ -822,4 +1242,4 @@ helm_check
 
 cd "$PARENT_ROOT"
 
-trap cleanup_tars EXIT
+trap cleanup EXIT
