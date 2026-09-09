@@ -19,8 +19,8 @@ service PoolRpc {
 
   rpc ListPools (ListPoolOptions) returns (ListPoolsResponse) {}
 
-  // Retrieve SMART / health information for the disk(s) backing a pool.
-  rpc GetPoolHealth (GetPoolHealthRequest) returns (GetPoolHealthResponse) {}
+  // Retrieve SMART / health information for the disk(s) backing pool(s).
+  rpc ListPoolsSMART (ListPoolsSmartOptions) returns (ListPoolsSmartResponse) {}
 
   rpc GrowPool (GrowPoolRequest) returns (GrowPoolResponse) {}
   rpc GrowPoolV2 (GrowPoolRequest) returns (Pool) {}
@@ -185,9 +185,10 @@ message ListPoolsResponse {
   repeated Pool pools = 1;  // list of the pools
 }
 
-message GetPoolHealthRequest {
-  string name = 1;                        // name of the pool
-  google.protobuf.StringValue uuid = 2;   // optional uuid for the pool
+message ListPoolsSmartOptions {
+  google.protobuf.StringValue name = 1;   // list health for the pool matching the name if provided
+  PoolTypeValue pooltype = 2;             // optional pooltype filter
+  google.protobuf.StringValue uuid = 3;   // list health for the pool matching the uuid if provided
 }
 
 // Device identity/inventory data. Static for the device's lifetime, so
@@ -246,14 +247,14 @@ message DeviceHealth {
   optional uint32 percentage_used = 6;               // estimated life used (may exceed 100)
   optional uint64 data_units_read = 7;
   optional uint64 data_units_written = 8;
-  optional uint64 host_reads = 14;
-  optional uint64 host_writes = 15;
-  optional uint64 controller_busy_minutes = 16;
-  optional uint64 power_cycles = 9;
-  optional uint64 power_on_hours = 10;
-  optional uint64 unsafe_shutdowns = 11;
-  optional uint64 media_errors = 12;
-  optional uint64 num_error_log_entries = 13;
+  optional uint64 host_reads = 9;
+  optional uint64 host_writes = 10;
+  optional uint64 controller_busy_minutes = 11;
+  optional uint64 power_cycles = 12;
+  optional uint64 power_on_hours = 13;
+  optional uint64 unsafe_shutdowns = 14;
+  optional uint64 media_errors = 15;
+  optional uint64 num_error_log_entries = 16;
   optional DeviceIdentity identity = 17;
   repeated SmartAttribute smart_attributes = 18;
   repeated NvmeErrorLogEntry error_log_entries = 19; // most recent error-log entries (bounded, see core::device_health)
@@ -267,8 +268,15 @@ message DiskHealth {
   optional string error = 4;            // populated with the failure reason when !supported
 }
 
-message GetPoolHealthResponse {
-  repeated DiskHealth disks = 1;        // one entry per disk backing the pool
+// SMART / health information for all disks backing a single pool.
+message PoolSmart {
+  string name = 1;                        // pool name
+  string uuid = 2;                        // pool uuid
+  repeated DiskHealth disks = 3;          // one entry per disk backing the pool
+}
+
+message ListPoolsSmartResponse {
+  repeated PoolSmart pools = 1;           // SMART info for each matched pool
 }
 
 message ListPoolOptions {

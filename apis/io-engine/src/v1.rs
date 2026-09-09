@@ -41,11 +41,11 @@ pub mod pool {
         pool_rpc_client::PoolRpcClient,
         pool_rpc_server::{PoolRpc, PoolRpcServer},
         ClearErrorRequest, ClearErrors, CreatePoolRequest, DestroyPoolRequest, DeviceHealth,
-        DeviceIdentity, DiskHealth, DiskInfo, ExportPoolRequest, GetPoolHealthRequest,
-        GetPoolHealthResponse, GrowPoolRequest, GrowPoolResponse, ImportPoolRequest,
-        ListPoolOptions, ListPoolsResponse, NvmeErrorLogEntry, Pool, PoolAlert, PoolAlertStatus,
-        PoolAlerts, PoolErrors, PoolMetadataArgs, PoolMetadataInfo, PoolProbes, PoolState,
-        PoolType, PoolTypeValue, ProbeDiskInfo, ProbeError, ProbeErrorCode, ProbePoolRequest,
+        DeviceIdentity, DiskHealth, DiskInfo, ExportPoolRequest, GrowPoolRequest, GrowPoolResponse,
+        ImportPoolRequest, ListPoolOptions, ListPoolsResponse, ListPoolsSmartOptions,
+        ListPoolsSmartResponse, NvmeErrorLogEntry, Pool, PoolAlert, PoolAlertStatus, PoolAlerts,
+        PoolErrors, PoolMetadataArgs, PoolMetadataInfo, PoolProbes, PoolSmart, PoolState, PoolType,
+        PoolTypeValue, ProbeDiskInfo, ProbeError, ProbeErrorCode, ProbePoolRequest,
         ProbePoolResponse, SmartAttribute,
     };
 }
