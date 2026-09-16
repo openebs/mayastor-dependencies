@@ -32,6 +32,10 @@ pkgs.mkShellNoCC {
     git
     xz
     llvmPackages.lld
+    # aws-lc-rs fips requirement
+    cmake
+    go
+    perl
   ] ++ pkgs.lib.optional (usePreCommit) pre-commit;
 
   LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";

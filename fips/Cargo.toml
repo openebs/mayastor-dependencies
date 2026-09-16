@@ -1,0 +1,11 @@
+[package]
+name = "fips"
+version = "0.1.0"
+edition = "2021"
+description = "FIPS mode for our rustls based TLS stacks, in one place."
+
+[dependencies]
+aws-lc-rs = { workspace = true, features = ["alloc", "ring-io", "ring-sig-verify", "fips"] }
+# std for the config builders, tls12 so that `require_ems` - which compliance
+# depends on - is actually compiled in rather than silently skipped.
+rustls = { workspace = true, features = ["aws_lc_rs", "fips", "std", "tls12"] }
