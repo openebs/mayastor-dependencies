@@ -5,7 +5,18 @@ edition = "2021"
 description = "FIPS mode for our rustls based TLS stacks, in one place."
 
 [dependencies]
-aws-lc-rs = { workspace = true, features = ["alloc", "ring-io", "ring-sig-verify", "fips"] }
+aws-lc-rs = { workspace = true, features = ["alloc", "ring-io", "ring-sig-verify"] }
 # std for the config builders, tls12 so that `require_ems` - which compliance
 # depends on - is actually compiled in rather than silently skipped.
-rustls = { workspace = true, features = ["aws_lc_rs", "fips", "std", "tls12"] }
+rustls = { workspace = true, features = ["aws_lc_rs", "std", "tls12"] }
+
+# The FIPS validated AWS-LC build (aws-lc-fips-sys) only builds for Windows
+# against MSVC - it shells out to vcvarsall.bat - so it cannot be cross-compiled
+# to the windows-gnu target we ship the kubectl plugin for. FIPS is a
+# Linux/Darwin server concern anyway, so enable the `fips` feature everywhere
+# except Windows, where we fall back to the standard AWS-LC. This is the single
+# place that turns FIPS on; feature unification carries it to every other rustls
+# and aws-lc-rs user in a binary that links us.
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+aws-lc-rs = { workspace = true, features = ["fips"] }
+rustls = { workspace = true, features = ["fips"] }

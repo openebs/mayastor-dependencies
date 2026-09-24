@@ -6,6 +6,12 @@
 //! cargo's feature unification. Components get that by depending on us, and
 //! should not repeat the pins themselves.
 //!
+//! The one exception is Windows: `aws-lc-fips-sys` only builds against MSVC and
+//! cannot be cross-compiled to the windows-gnu target, so the `fips` feature is
+//! off there and the standard AWS-LC is used instead. On such a build [`init`]
+//! finds no FIPS provider and returns [`Error::NotValidated`], while
+//! [`init_if`]`(false)` stays a no-op.
+//!
 //! What is left to do at runtime is [`init`], as early in `main` as possible.
 //!
 //! Do not be alarmed by `aws-lc-sys`, the *non* FIPS module, showing up in the
@@ -65,6 +71,11 @@ impl std::error::Error for Error {}
 /// installer is not an error so long as what won is FIPS validated too, which
 /// [`enabled`] is what actually decides.
 pub fn init() -> Result<(), Error> {
+    // default_fips_provider() only exists with rustls' `fips` feature, which we
+    // do not build on Windows (aws-lc-fips-sys cannot be cross-compiled there).
+    // Without it nothing installs a FIPS provider, so enabled() stays false and
+    // we report NotValidated - which is the truth on a non-FIPS build.
+    #[cfg(not(target_os = "windows"))]
     let _ = rustls::crypto::default_fips_provider().install_default();
 
     if !enabled() {
