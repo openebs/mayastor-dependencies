@@ -65,7 +65,7 @@ runs:
     # while the SBOMs are worth keeping for the default retention.
     - name: Upload the SBOMs
       if: inputs.sbom == 'true'
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.sbom-artifact-prefix }}-${{ runner.arch }}
         path: images/*/*.cdx.json
