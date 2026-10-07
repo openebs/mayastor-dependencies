@@ -25,6 +25,8 @@ message MayastorFeatures {
   uint32 nexus_label_version = 6;
   // The io-engine gRPC server has TLS enabled and expects TLS connections.
   optional bool grpcTls = 7;
+  // The io-engine runs in FIPS mode: its crypto modules are FIPS validated.
+  optional bool fips = 8;
 }
 
 // The transport capabilities of the node an io-engine runs on. Computed the
