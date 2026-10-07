@@ -48,6 +48,11 @@ pkgs.mkShellNoCC {
       pre-commit install --hook commit-msg
     fi
 
+    if [ "$VSCODE_CLI" = "1" ] || [ -n "$VSCODE_CWD" ]; then
+      export TMPDIR=/tmp
+      export TMP=/tmp
+    fi
+
     if [ -d ~/.cargo/bin ]; then
       # Adding ~/.cargo/bin to the path let's us carry on using rustup but it lowers its
       # priority: https://github.com/rust-lang/cargo/pull/11023

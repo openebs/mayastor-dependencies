@@ -102,6 +102,34 @@ pub fn enabled() -> bool {
     rustls::crypto::CryptoProvider::get_default().is_some_and(|provider| provider.fips())
 }
 
+/// The signature verification schemes the process' crypto provider supports.
+///
+/// In FIPS mode the installed default provider is the FIPS validated AWS-LC, so
+/// this lists only the FIPS-approved schemes (for instance no SHA-1 or EdDSA).
+/// Otherwise no default is installed until some component asks for one, so we
+/// fall back to the standard AWS-LC provider and report its full set, which is
+/// what those components will go on to install and use.
+///
+/// This is the set a hand-rolled rustls certificate verifier should advertise
+/// from [`supported_verify_schemes`], so that it offers exactly what the
+/// provider can actually verify. The usual rustls builders derive this for
+/// their own verifiers already.
+///
+/// [`supported_verify_schemes`]: rustls::client::danger::ServerCertVerifier::supported_verify_schemes
+pub fn supported_signature_schemes() -> Vec<rustls::SignatureScheme> {
+    match rustls::crypto::CryptoProvider::get_default() {
+        Some(provider) => provider
+            .signature_verification_algorithms
+            .supported_schemes(),
+        // No default is installed yet (we are not in FIPS mode): report the
+        // standard provider's schemes, the set that will actually be used once
+        // a component installs it.
+        None => rustls::crypto::aws_lc_rs::default_provider()
+            .signature_verification_algorithms
+            .supported_schemes(),
+    }
+}
+
 /// Asserts that a TLS configuration is FIPS compliant.
 ///
 /// Only needed by components which build their own configs. A config built
