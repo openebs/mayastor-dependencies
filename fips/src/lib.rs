@@ -102,32 +102,69 @@ pub fn enabled() -> bool {
     rustls::crypto::CryptoProvider::get_default().is_some_and(|provider| provider.fips())
 }
 
-/// The signature verification schemes the process' crypto provider supports.
+/// Runs `f` against the process' crypto provider: the installed FIPS validated
+/// default when present, else the standard AWS-LC provider the rustls builders
+/// would install themselves on first use. Borrows the provider, so the reader
+/// pays for nothing more than what it takes out of it.
+fn with_provider<T>(f: impl FnOnce(&rustls::crypto::CryptoProvider) -> T) -> T {
+    match rustls::crypto::CryptoProvider::get_default() {
+        Some(provider) => f(provider),
+        None => f(&rustls::crypto::aws_lc_rs::default_provider()),
+    }
+}
+
+/// The crypto provider the process' TLS stacks use.
+///
+/// In FIPS mode [`init`] has installed the FIPS validated AWS-LC as the
+/// process-wide default, so that is returned. Otherwise no default is installed
+/// until some component asks for one, so we return the standard AWS-LC
+/// provider: the one the rustls builders would themselves install on first use,
+/// so building a config with it is equivalent to letting them.
+///
+/// Use this with the `*_with_provider` rustls builders when a config must be
+/// pinned to this provider explicitly rather than the process default; the
+/// plain builders already derive it themselves.
+pub fn provider() -> std::sync::Arc<rustls::crypto::CryptoProvider> {
+    // Share the installed Arc (a refcount bump) rather than deep-cloning the
+    // provider; only when none is installed do we allocate one. This cannot go
+    // through with_provider(), which hands out a borrow and so could only
+    // clone the whole provider into a fresh Arc.
+    rustls::crypto::CryptoProvider::get_default()
+        .cloned()
+        .unwrap_or_else(|| std::sync::Arc::new(rustls::crypto::aws_lc_rs::default_provider()))
+}
+
+/// The signature verification algorithms the process' crypto provider supports.
 ///
 /// In FIPS mode the installed default provider is the FIPS validated AWS-LC, so
-/// this lists only the FIPS-approved schemes (for instance no SHA-1 or EdDSA).
-/// Otherwise no default is installed until some component asks for one, so we
-/// fall back to the standard AWS-LC provider and report its full set, which is
-/// what those components will go on to install and use.
+/// these are only the FIPS-approved algorithms (for instance no SHA-1 or
+/// EdDSA). Otherwise no default is installed until some component asks for one,
+/// so we fall back to the standard AWS-LC provider's algorithms, the set that
+/// will actually be used once a component installs it.
 ///
-/// This is the set a hand-rolled rustls certificate verifier should advertise
-/// from [`supported_verify_schemes`], so that it offers exactly what the
-/// provider can actually verify. The usual rustls builders derive this for
-/// their own verifiers already.
+/// A hand-rolled rustls certificate verifier should verify handshake
+/// signatures against these - via [`rustls::crypto::verify_tls12_signature`]
+/// and [`rustls::crypto::verify_tls13_signature`] - and advertise their
+/// [`supported_schemes`] from [`supported_verify_schemes`], so it both offers
+/// and checks exactly what the provider can handle. The usual rustls builders
+/// wire this up for their own verifiers already.
+///
+/// [`supported_schemes`]: rustls::crypto::WebPkiSupportedAlgorithms::supported_schemes
+/// [`supported_verify_schemes`]: rustls::client::danger::ServerCertVerifier::supported_verify_schemes
+pub fn signature_verification_algorithms() -> rustls::crypto::WebPkiSupportedAlgorithms {
+    // Only the field is needed here, a Copy of two &'static slices, so this
+    // takes it without cloning the whole provider that provider() returns.
+    with_provider(|provider| provider.signature_verification_algorithms)
+}
+
+/// The signature verification schemes the process' crypto provider supports.
+///
+/// This is [`signature_verification_algorithms`] rendered as the schemes a
+/// hand-rolled verifier should advertise from [`supported_verify_schemes`].
 ///
 /// [`supported_verify_schemes`]: rustls::client::danger::ServerCertVerifier::supported_verify_schemes
 pub fn supported_signature_schemes() -> Vec<rustls::SignatureScheme> {
-    match rustls::crypto::CryptoProvider::get_default() {
-        Some(provider) => provider
-            .signature_verification_algorithms
-            .supported_schemes(),
-        // No default is installed yet (we are not in FIPS mode): report the
-        // standard provider's schemes, the set that will actually be used once
-        // a component installs it.
-        None => rustls::crypto::aws_lc_rs::default_provider()
-            .signature_verification_algorithms
-            .supported_schemes(),
-    }
+    signature_verification_algorithms().supported_schemes()
 }
 
 /// Asserts that a TLS configuration is FIPS compliant.
