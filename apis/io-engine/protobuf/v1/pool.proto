@@ -193,7 +193,7 @@ message ListPoolsSmartOptions {
 
 // Device identity/inventory data. Static for the device's lifetime, so
 // implementations should fetch this once and cache it rather than re-reading
-// it on every health poll -- unlike DeviceHealth's counters, which are always
+// it on every health poll -- unlike SmartData's counters, which are always
 // read fresh. Fields a given device or transport cannot report are left unset.
 message DeviceIdentity {
   optional string model = 1;
@@ -211,8 +211,8 @@ message DeviceIdentity {
 }
 
 // A single SMART attribute table entry (ATA devices only -- SAS/NVMe report
-// an empty list here since their equivalent thresholds are already
-// first-class fields on DeviceHealth, e.g. available_spare_threshold_percent).
+// no attribute table since their equivalent thresholds are already
+// first-class fields on SmartData/NvmeSmart, e.g. available_spare_threshold_percent).
 message SmartAttribute {
   uint32 id = 1;
   string name = 2;
@@ -235,36 +235,57 @@ message NvmeErrorLogEntry {
   optional uint32 namespace_id = 6;    // namespace ID associated with the error, when applicable
 }
 
-// SMART / health information for a backing device. NVMe (when attached via
-// uring/aio rather than VFIO), SATA and SAS are all read with smartctl. Fields
-// that a given device or transport cannot report are left unset.
-message DeviceHealth {
-  uint32 critical_warning = 1;                       // raw NVMe critical-warning flags (0 == none)
-  bool healthy = 2;                                  // true when no critical condition is reported
-  optional sint32 temperature_celsius = 3;
-  optional uint32 available_spare_percent = 4;
-  optional uint32 available_spare_threshold_percent = 5;
-  optional uint32 percentage_used = 6;               // estimated life used (may exceed 100)
-  optional uint64 data_units_read = 7;
-  optional uint64 data_units_written = 8;
-  optional uint64 host_reads = 9;
-  optional uint64 host_writes = 10;
-  optional uint64 controller_busy_minutes = 11;
-  optional uint64 power_cycles = 12;
-  optional uint64 power_on_hours = 13;
-  optional uint64 unsafe_shutdowns = 14;
-  optional uint64 media_errors = 15;
-  optional uint64 num_error_log_entries = 16;
-  optional DeviceIdentity identity = 17;
-  repeated SmartAttribute smart_attributes = 18;
-  repeated NvmeErrorLogEntry error_log_entries = 19; // most recent error-log entries (bounded, see core::device_health)
+// SMART data for a backing device. NVMe (when attached via uring/aio rather
+// than VFIO), SATA and SAS are all read with smartctl. Fields that a given
+// device or transport cannot report are left unset.
+message SmartData {
+  optional bool smart_status_passed = 1;                  // device self-assessment; unset when the device reports no verdict
+  optional sint32 temperature_celsius = 2;                // composite temperature in degrees Celsius; same value as nvme.temperature_celsius on NVMe
+  optional uint64 power_on_hours = 3;                     // cumulative power-on hours
+  optional uint64 power_cycles = 4;                       // number of power cycles
+  optional DeviceIdentity identity = 5;                   // model, serial number, firmware_revision, etc.
+  optional uint32 available_spare_percent = 6;            // NVMe: Available Spare; SATA: smartctl spare_available.current_percent
+  optional uint32 available_spare_threshold_percent = 7;  // NVMe: Available Spare Threshold; SATA: spare_available.threshold_percent
+  optional uint32 percentage_used = 8;                    // NVMe: Percentage Used; SATA: smartctl endurance_used.current_percent (may exceed 100)
+  oneof protocol {
+    NvmeSmart nvme = 9;                                   // NVMe devices only
+    AtaSmart ata = 10;                                    // SATA/ATA devices only
+  }
 }
 
-// Health for a single disk backing the pool.
-message DiskHealth {
+// NVMe SMART / Health Information log (LID 02h) and Error Information log (LID 01h).
+// Values repeated from SmartData are written from the same reading, so they always match.
+message NvmeSmart {
+  uint32 critical_warning = 1;                            // raw NVMe critical-warning flags (0 == none)
+  optional sint32 temperature_celsius = 2;                // composite temperature in degrees Celsius
+  optional uint32 available_spare_percent = 3;            // remaining spare capacity as a percentage
+  optional uint32 available_spare_threshold_percent = 4;  // spare percentage below which the device flags a problem
+  optional uint32 percentage_used = 5;                    // estimated life used (may exceed 100)
+  optional uint64 data_units_read = 6;                    // number of 512-byte data units read
+  optional uint64 data_units_written = 7;                 // number of 512-byte data units written
+  optional uint64 host_reads = 8;                         // number of host read commands
+  optional uint64 host_writes = 9;                        // number of host write commands
+  optional uint64 controller_busy_minutes = 10;           // time the controller was busy with I/O, in minutes
+  optional uint64 power_cycles = 11;                      // number of power cycles
+  optional uint64 power_on_hours = 12;                    // cumulative power-on hours
+  optional uint64 unsafe_shutdowns = 13;                  // number of unsafe shutdowns
+  optional uint64 media_errors = 14;                      // media and data integrity errors
+  optional uint64 num_error_log_entries = 15;             // number of error information log entries reported by the controller
+  optional uint32 warning_temp_time = 16;                 // minutes at or above the warning composite temperature
+  optional uint32 critical_comp_time = 17;                // minutes at or above the critical composite temperature
+  repeated NvmeErrorLogEntry error_log_entries = 18;      // most recent error-log entries (bounded, see core::device_health)
+}
+
+// ATA SMART attribute table. SAS and NVMe report no attribute table.
+message AtaSmart {
+  repeated SmartAttribute attributes = 1;
+}
+
+// SMART data for a single disk backing the pool.
+message DiskSmart {
   string disk_uri = 1;                  // the disk uri as claimed by the pool
-  bool supported = 2;                   // false when health can't be read (e.g. VFIO/pcie disks)
-  optional DeviceHealth health = 3;     // populated when supported
+  bool supported = 2;                   // false when SMART can't be read (e.g. VFIO/pcie disks)
+  optional SmartData smart = 3;         // populated when supported
   optional string error = 4;            // populated with the failure reason when !supported
 }
 
@@ -272,7 +293,7 @@ message DiskHealth {
 message PoolSmart {
   string name = 1;                        // pool name
   string uuid = 2;                        // pool uuid
-  repeated DiskHealth disks = 3;          // one entry per disk backing the pool
+  repeated DiskSmart disks = 3;           // one entry per disk backing the pool
 }
 
 message ListPoolsSmartResponse {

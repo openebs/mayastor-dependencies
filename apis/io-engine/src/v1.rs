@@ -40,13 +40,13 @@ pub mod pool {
     pub use super::pb::{
         pool_rpc_client::PoolRpcClient,
         pool_rpc_server::{PoolRpc, PoolRpcServer},
-        ClearErrorRequest, ClearErrors, CreatePoolRequest, DestroyPoolRequest, DeviceHealth,
-        DeviceIdentity, DiskHealth, DiskInfo, ExportPoolRequest, GrowPoolRequest, GrowPoolResponse,
-        ImportPoolRequest, ListPoolOptions, ListPoolsResponse, ListPoolsSmartOptions,
-        ListPoolsSmartResponse, NvmeErrorLogEntry, Pool, PoolAlert, PoolAlertStatus, PoolAlerts,
-        PoolErrors, PoolMetadataArgs, PoolMetadataInfo, PoolProbes, PoolSmart, PoolState, PoolType,
-        PoolTypeValue, ProbeDiskInfo, ProbeError, ProbeErrorCode, ProbePoolRequest,
-        ProbePoolResponse, SmartAttribute,
+        smart_data, AtaSmart, ClearErrorRequest, ClearErrors, CreatePoolRequest,
+        DestroyPoolRequest, DeviceIdentity, DiskInfo, DiskSmart, ExportPoolRequest,
+        GrowPoolRequest, GrowPoolResponse, ImportPoolRequest, ListPoolOptions, ListPoolsResponse,
+        ListPoolsSmartOptions, ListPoolsSmartResponse, NvmeErrorLogEntry, NvmeSmart, Pool,
+        PoolAlert, PoolAlertStatus, PoolAlerts, PoolErrors, PoolMetadataArgs, PoolMetadataInfo,
+        PoolProbes, PoolSmart, PoolState, PoolType, PoolTypeValue, ProbeDiskInfo, ProbeError,
+        ProbeErrorCode, ProbePoolRequest, ProbePoolResponse, SmartAttribute, SmartData,
     };
 }
 
