@@ -1,0 +1,33 @@
+[package]
+name = "grpc-tls"
+version = "0.1.0"
+edition = "2021"
+description = "Shared gRPC TLS primitives (auto-TLS and file-backed mutual TLS) for our rustls based transports, in one place."
+
+[dependencies]
+# Shared rustls/aws-lc configuration (FIPS mode, signature algorithms) lives in
+# the sibling `fips` crate so there is a single place that selects the crypto
+# provider; reuse it here so every gRPC TLS stack verifies handshakes the same way.
+fips = { path = "../fips" }
+# File watching for hot-reloading rotated certificates.
+cert-watcher = { path = "../cert-watcher" }
+
+rustls = { workspace = true }
+# tonic's `Connected` for the rustls server stream (which exposes the peer
+# certificates) is behind its TLS feature; keep it on the same aws-lc backend.
+tonic = { workspace = true, features = ["tls-aws-lc"] }
+tokio = { workspace = true, features = ["net"] }
+tokio-stream = { workspace = true }
+futures = { workspace = true }
+tracing = { workspace = true }
+http = { workspace = true }
+tokio-rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
+rustls-native-certs = { workspace = true }
+hyper-util = { workspace = true, features = ["tokio"] }
+tower = { workspace = true }
+rcgen = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "sync", "io-util"] }
