@@ -19,6 +19,11 @@ fn main() {
         .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
         .extern_path(".google.protobuf.Timestamp", "::prost_extend::Timestamp")
         .extern_path(".google.protobuf.Duration", "::prost_extend::Duration")
+        // NvmeSmart is much larger than AtaSmart, but boxing it would leak into every consumer.
+        .type_attribute(
+            ".mayastor.v1.SmartData.protocol",
+            "#[allow(clippy::large_enum_variant)]",
+        )
         .compile_protos(
             &[
                 "protobuf/v1/bdev.proto",
