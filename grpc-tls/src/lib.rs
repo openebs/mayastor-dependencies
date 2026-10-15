@@ -9,9 +9,12 @@
 //!   provisioned.
 //! - **file-backed (mutual) TLS**: certificate/key (and optional CA) files on disk, see
 //!   [`TlsConfig`]. The server verifies the client certificate against the CA when one is
-//!   configured (mutual TLS), and the client verifies the server against the CA (or the system
-//!   trust roots when none is set) and presents its own certificate for mutual TLS. File-backed
-//!   material is reloaded when the files rotate on disk, see [`Reloadable`].
+//!   configured (mutual TLS), and the client verifies the server by CA membership — the server
+//!   certificate must chain to the CA (or the system trust roots when none is set), but its
+//!   hostname is not pinned, since mesh components are reached over dynamic addresses (for example
+//!   an io-engine's pod IP) that a shared certificate cannot carry as SANs. The client presents
+//!   its own certificate for mutual TLS. File-backed material is reloaded when the files rotate on
+//!   disk, see [`Reloadable`].
 //!
 //! On the server side, a [`Listener`] accepts connections for tonic with the handshakes performed
 //! concurrently. It serves TLS exclusively ([`Listener::tls_incoming`]) unless a server sitting at
@@ -237,6 +240,80 @@ impl rustls::client::danger::ServerCertVerifier for NoCertificateVerification {
     }
 }
 
+/// A server certificate verifier that authenticates the server by CA membership rather than by
+/// hostname: it verifies that the presented certificate chains to the configured trust roots (our
+/// shared CA, or the system roots when none is configured), but does not check that the
+/// certificate's subject alternative names match the endpoint's host.
+///
+/// This is the trust model for our file-backed mesh: every component is issued a certificate by a
+/// single shared CA, and components reach each other over dynamic addresses (for example the
+/// control-plane dials an io-engine by its pod IP) that a statically-provisioned certificate
+/// cannot enumerate as SANs.
+///
+/// Trust therefore rests on CA membership and, where a client certificate is presented, mutual
+/// authentication — not on hostname pinning.
+/// The handshake signature is still verified with the installed crypto provider's algorithms,
+/// so only FIPS-approved ones are used in FIPS mode.
+#[derive(Debug)]
+struct CaMembershipVerification {
+    roots: Arc<rustls::RootCertStore>,
+}
+
+impl rustls::client::danger::ServerCertVerifier for CaMembershipVerification {
+    fn verify_server_cert(
+        &self,
+        end_entity: &rustls::pki_types::CertificateDer,
+        intermediates: &[rustls::pki_types::CertificateDer],
+        _server_name: &rustls::pki_types::ServerName,
+        _ocsp_response: &[u8],
+        now: rustls::pki_types::UnixTime,
+    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+        let end_entity = rustls::server::ParsedCertificate::try_from(end_entity)?;
+        // Verify the chain to a trust anchor but deliberately skip the name check
+        // (`rustls::client::verify_server_name`): see the type documentation.
+        rustls::client::verify_server_cert_signed_by_trust_anchor(
+            &end_entity,
+            &self.roots,
+            intermediates,
+            now,
+            fips::signature_verification_algorithms().all,
+        )?;
+        Ok(rustls::client::danger::ServerCertVerified::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        certificate: &rustls::pki_types::CertificateDer,
+        signature: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        rustls::crypto::verify_tls13_signature(
+            message,
+            certificate,
+            signature,
+            &fips::signature_verification_algorithms(),
+        )
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        certificate: &rustls::pki_types::CertificateDer,
+        signature: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        rustls::crypto::verify_tls12_signature(
+            message,
+            certificate,
+            signature,
+            &fips::signature_verification_algorithms(),
+        )
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        fips::supported_signature_schemes()
+    }
+}
+
 /// The ALPN protocol of gRPC's HTTP/2 transport.
 const H2_ALPN: &[u8] = b"h2";
 
@@ -327,16 +404,19 @@ fn root_store(
 
 /// Build a client TLS configuration from certificate files.
 ///
-/// The CA bundle, if provided, replaces the default trust roots used to verify the server
-/// certificate; otherwise the system trust roots are used. A certificate/key pair, if provided, is
-/// presented to the server for mutual TLS.
+/// The server is authenticated by CA membership rather than by hostname (see
+/// [`CaMembershipVerification`]): its certificate must chain to the configured CA bundle (or the
+/// system trust roots when none is set), but its SANs are not matched against the endpoint host. A
+/// certificate/key pair, if provided, is presented to the server for mutual TLS.
 pub fn file_client_config(
     ca_certificate: Option<&Path>,
     certificate: Option<&Path>,
     private_key: Option<&Path>,
 ) -> Result<rustls::ClientConfig, Error> {
-    let roots = root_store(ca_certificate, CertFile::CaFile)?;
-    let builder = rustls::ClientConfig::builder().with_root_certificates(roots);
+    let roots = Arc::new(root_store(ca_certificate, CertFile::CaFile)?);
+    let builder = rustls::ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(CaMembershipVerification { roots }));
     let mut config = match (certificate, private_key) {
         (Some(certificate), Some(private_key)) => builder
             .with_client_auth_cert(
