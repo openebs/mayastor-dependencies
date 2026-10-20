@@ -179,11 +179,31 @@ pub enum Error {
         source: rcgen::Error,
     },
     /// Failed to establish the TLS channel to the endpoint.
-    #[error("failed to connect the TLS channel: {source}")]
+    #[error("failed to connect the TLS channel: {}", tonic_error_chain(source))]
     Connect {
         /// The underlying tonic transport error.
         source: tonic::transport::Error,
     },
+}
+
+fn error_chain(error: &dyn std::error::Error) -> String {
+    let mut chain = error.to_string();
+    let mut source = error.source();
+    while let Some(error) = source {
+        let error_string = error.to_string();
+        if !chain.contains(&error_string) {
+            chain.push_str(": ");
+            chain.push_str(&error_string);
+        }
+        source = error.source();
+    }
+    chain
+}
+fn tonic_error_chain(error: &tonic::transport::Error) -> String {
+    if tracing::enabled!(tracing::Level::TRACE) {
+        return format!("{error:?}");
+    }
+    error_chain(error)
 }
 
 /// A server certificate verifier that does not authenticate the server identity, but still
