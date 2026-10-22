@@ -38,15 +38,16 @@ pub mod json {
 
 pub mod pool {
     pub use super::pb::{
+        lvm_pool_args,
         pool_rpc_client::PoolRpcClient,
         pool_rpc_server::{PoolRpc, PoolRpcServer},
         smart_data, AtaSmart, ClearErrorRequest, ClearErrors, CreatePoolRequest,
         DestroyPoolRequest, DeviceIdentity, DiskInfo, DiskSmart, ExportPoolRequest,
         GrowPoolRequest, GrowPoolResponse, ImportPoolRequest, ListPoolOptions, ListPoolsResponse,
-        ListPoolsSmartOptions, ListPoolsSmartResponse, NvmeErrorLogEntry, NvmeSmart, Pool,
-        PoolAlert, PoolAlertStatus, PoolAlerts, PoolErrors, PoolMetadataArgs, PoolMetadataInfo,
-        PoolProbes, PoolSmart, PoolState, PoolType, PoolTypeValue, ProbeDiskInfo, ProbeError,
-        ProbeErrorCode, ProbePoolRequest, ProbePoolResponse, SmartAttribute, SmartData,
+        ListPoolsSmartOptions, ListPoolsSmartResponse, LvmPoolArgs, NvmeErrorLogEntry, NvmeSmart,
+        Pool, PoolAlert, PoolAlertStatus, PoolAlerts, PoolErrors, PoolMetadataArgs,
+        PoolMetadataInfo, PoolProbes, PoolSmart, PoolState, PoolType, PoolTypeValue, ProbeDiskInfo,
+        ProbeError, ProbeErrorCode, ProbePoolRequest, ProbePoolResponse, SmartAttribute, SmartData,
     };
 }
 
