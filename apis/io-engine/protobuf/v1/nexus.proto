@@ -7,6 +7,7 @@ import "common.proto";
 package mayastor.v1;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
 
 service NexusRpc {
   // Nexus related methods.
@@ -48,6 +49,16 @@ service NexusRpc {
   rpc GetRebuildStats (RebuildStatsRequest) returns (RebuildStatsResponse) {}
   rpc GetRebuildHistory (RebuildHistoryRequest) returns (RebuildHistoryResponse) {}
   rpc ListRebuildHistory (ListRebuildHistoryRequest) returns (ListRebuildHistoryResponse) {}
+
+  // Nexus I/O pause holds.
+  //
+  // Hold the nexus I/O paused on behalf of a holder: new I/O from the initiators is queued
+  // (admin commands such as keep-alive are still served) until every hold is released.
+  // A hold is released automatically when its lease expires, unless renewed by calling
+  // PauseNexusIo again with the same holder_id. Idempotent per holder_id.
+  rpc PauseNexusIo (PauseNexusIoRequest) returns (PauseNexusIoResponse) {}
+  // Release the hold of a holder. Releasing a holder which holds no pause succeeds.
+  rpc ResumeNexusIo (ResumeNexusIoRequest) returns (ResumeNexusIoResponse) {}
 }
 
 // The label versioning for the nexus
@@ -465,5 +476,30 @@ message ResumeRebuildRequest {
 }
 
 message ResumeRebuildResponse {
+  Nexus nexus = 1;
+}
+
+message PauseNexusIoRequest {
+  string nexus_uuid = 1;  // uuid of the nexus
+  string holder_id = 2;   // identifies the owner of the hold, eg: a group snapshot operation
+  google.protobuf.Duration lease = 3; // the hold is released if not renewed within this time
+  // Only renew the existing hold of this holder: fails if it no longer holds the pause, eg: because
+  // its lease expired, rather than pausing the I/O again.
+  bool renew_only = 4;
+  // How long to wait for the in-flight I/O to drain. If the pause doesn't complete in time the request
+  // fails and the pause is released as soon as it completes. Unset: wait until the pause completes.
+  optional google.protobuf.Duration timeout = 5;
+}
+
+message PauseNexusIoResponse {
+  Nexus nexus = 1;
+}
+
+message ResumeNexusIoRequest {
+  string nexus_uuid = 1;  // uuid of the nexus
+  string holder_id = 2;   // the owner of the hold to release
+}
+
+message ResumeNexusIoResponse {
   Nexus nexus = 1;
 }

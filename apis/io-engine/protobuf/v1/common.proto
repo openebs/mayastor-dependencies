@@ -27,6 +27,8 @@ message MayastorFeatures {
   optional bool grpcTls = 7;
   // The io-engine runs in FIPS mode: its crypto modules are FIPS validated.
   optional bool fips = 8;
+  // Support for holding the nexus I/O paused via PauseNexusIo/ResumeNexusIo.
+  optional bool nexusIoPause = 9;
 }
 
 // The transport capabilities of the node an io-engine runs on. Computed the
