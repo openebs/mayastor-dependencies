@@ -507,4 +507,29 @@ message ProbePoolResponse {
 
   // All the probe errors (per disk).
   map<string,ProbeDiskInfo> errors = 4;
+
+  // An operation which the data-plane is already performing on this pool.
+  // Unset means no operation is in progress.
+  // This is not an error: the caller has nothing to do but wait for it to complete, rather than
+  // issue a competing request which can only be aborted.
+  optional PoolOperation in_progress = 5;
+}
+
+// An operation which the data-plane is already performing on a pool.
+// Pool-level, and deliberately a closed set: these are states rather than disk faults, so they
+// do not belong in ProbeErrorCode.
+enum PoolOperation {
+  // An operation is in progress, but we have no specific value for it.
+  // Absence of in_progress, not this, is what says no operation is in progress.
+  OpUnknown = 0;
+  // The pool is being created.
+  Create = 1;
+  // The pool is being imported.
+  Import = 2;
+  // The pool is being destroyed.
+  Destroy = 3;
+  // The pool is being grown.
+  Grow = 4;
+  // The pool is being stat'ed.
+  Stat = 5;
 }
