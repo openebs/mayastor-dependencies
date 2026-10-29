@@ -530,4 +530,50 @@ message ProbePoolResponse {
 
   // All the probe errors (per disk).
   map<string,ProbeDiskInfo> errors = 4;
+
+  // Set when the data-plane is busy with an operation on another pool.
+  // Pool operations are serialised, so a request for this pool would not fail, it would simply
+  // queue behind that one - which a caller with its own deadline may prefer to wait out.
+  optional bool service_busy = 5;
+
+  // An operation which the data-plane is already performing on this pool.
+  // Unset means no operation is in progress.
+  // This is not an error: the caller has nothing to do but wait for it to complete, rather than
+  // issue a competing request which can only be aborted.
+  optional PoolOperation in_progress = 6;
+}
+
+// An operation which the data-plane is already performing on a pool.
+// Pool-level, and deliberately a closed set: these are states rather than disk faults, so they
+// do not belong in ProbeErrorCode.
+enum PoolOperation {
+  // An operation is in progress, but we have no specific value for it.
+  // Absence of in_progress, not this, is what says no operation is in progress.
+  OpUnknown = 0;
+  // The pool is being created.
+  Create = 1;
+  // The pool is being imported.
+  Import = 2;
+  // The pool is being destroyed.
+  Destroy = 3;
+  // The pool is being grown.
+  Grow = 4;
+  // The pool is being stat'ed.
+  Stat = 5;
+  // The pool's SMART data is being read.
+  Smart = 6;
+  // The pool is being exported.
+  Export = 7;
+  // The pool's errors are being cleared.
+  ClearPoolErrors = 8;
+  // A replica is being created on the pool.
+  ReplicaCreate = 9;
+  // A replica is being destroyed on the pool.
+  ReplicaDestroy = 10;
+  // A snapshot is being destroyed on the pool.
+  SnapshotDestroy = 11;
+  // A replica on the pool is being shared.
+  ReplicaShare = 12;
+  // A replica on the pool is being unshared.
+  ReplicaUnshare = 13;
 }

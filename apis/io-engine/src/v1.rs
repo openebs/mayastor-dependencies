@@ -46,8 +46,9 @@ pub mod pool {
         GrowPoolRequest, GrowPoolResponse, ImportPoolRequest, ListPoolOptions, ListPoolsResponse,
         ListPoolsSmartOptions, ListPoolsSmartResponse, LvmPoolArgs, NvmeErrorLogEntry, NvmeSmart,
         Pool, PoolAlert, PoolAlertStatus, PoolAlerts, PoolErrors, PoolMetadataArgs,
-        PoolMetadataInfo, PoolProbes, PoolSmart, PoolState, PoolType, PoolTypeValue, ProbeDiskInfo,
-        ProbeError, ProbeErrorCode, ProbePoolRequest, ProbePoolResponse, SmartAttribute, SmartData,
+        PoolMetadataInfo, PoolOperation, PoolProbes, PoolSmart, PoolState, PoolType, PoolTypeValue,
+        ProbeDiskInfo, ProbeError, ProbeErrorCode, ProbePoolRequest, ProbePoolResponse,
+        SmartAttribute, SmartData,
     };
 }
 

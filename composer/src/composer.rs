@@ -32,7 +32,7 @@ use bollard::{
     exec::{CreateExecOptions, StartExecResults},
     image::CreateImageOptions,
     models::{ContainerCreateResponse, ContainerInspectResponse, IpamConfig},
-    network::DisconnectNetworkOptions,
+    network::{ConnectNetworkOptions, DisconnectNetworkOptions},
 };
 use futures::future::{join_all, try_join_all};
 
@@ -1679,6 +1679,26 @@ impl ComposeTest {
                 DisconnectNetworkOptions {
                     container: id.0.as_str(),
                     force: false,
+                },
+            )
+            .await
+    }
+
+    /// reconnect container to the network, with its original ip address
+    pub async fn reconnect(&self, container_name: &str) -> Result<(), Error> {
+        let (id, ip) = self.containers.get(container_name).unwrap();
+        self.docker
+            .connect_network(
+                &self.network_id,
+                ConnectNetworkOptions {
+                    container: id.as_str(),
+                    endpoint_config: EndpointSettings {
+                        ipam_config: Some(EndpointIpamConfig {
+                            ipv4_address: Some(ip.to_string()),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
                 },
             )
             .await
