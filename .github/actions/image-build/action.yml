@@ -34,7 +34,7 @@ runs:
         # BUG: HEAD tag is fetched as lightweight instead of annotated
         # https://github.com/actions/checkout/issues/290
         git fetch -f origin ${{ github.ref }}:${{ github.ref }}
-    - uses: cachix/install-nix-action@v31.11.1
+    - uses: cachix/install-nix-action@v31.11.3
     - name: Build the release images
       shell: bash
       env:
