@@ -55,9 +55,13 @@ message CreatePoolRequest {
   repeated string disks = 3;
   // Type of the pool.
   PoolType pooltype = 4;
-  // Default cluster size is 4MiB (4 * 1024 * 1024), input cluster size must be in "bytes" but
-  // must be multiple of 1MiB, else default cluster size i.e 4MiB will be considered. Minimum
-  // cluster size can be input as 1048576 (1024 * 1024) bytes (1MiB)
+  // Allocation granularity in bytes. Each backend checks it.
+  // Lvs: the blobstore cluster size. Default cluster size is 4MiB (4 * 1024 * 1024), input
+  // cluster size must be in "bytes" but must be multiple of 1MiB, else default cluster size i.e
+  // 4MiB will be considered. Minimum cluster size can be input as 1048576 (1024 * 1024) bytes
+  // (1MiB)
+  // Lvm: the thin pool chunk size, used only when lvm asks for a thin pool. It must be a
+  // multiple of 64KiB between 64KiB and 1GiB. When unset, lvm picks the chunk size.
   optional uint32 cluster_size = 5;
   // Optional pool metadata arguments.
   optional PoolMetadataArgs md_args = 6;
@@ -67,6 +71,8 @@ message CreatePoolRequest {
     EncryptionData data = 7;
     EncryptionSecret secret = 8;
   }
+  // Options only the Lvm backend has. Other backends reject the request when it is set.
+  optional LvmPoolArgs lvm = 9;
 }
 
 // Pool metadata arguments.
@@ -85,6 +91,23 @@ message PoolMetadataArgs {
   // User can pass Absolute size. For example, 800GiB, 3.5TiB or 4563726394B.
   //
   optional string max_expansion = 2;
+}
+
+// Pool options of the Lvm backend, used on create only: the volume group keeps its thin pool
+// across export and import.
+message LvmPoolArgs {
+  // The thin pool to create in the volume group. Unset means no thin pool, so the pool only
+  // holds thick replicas.
+  oneof thin_pool {
+    // Size in bytes.
+    uint64 thin_pool_size = 1;
+    // Percentage of the volume group's free space, 1 to 100, as lvcreate's N%FREE. lvm keeps
+    // room for the thin pool's metadata, so 100 fills the volume group.
+    uint32 thin_pool_free_percent = 2;
+    // Percentage of the volume group's total size, 1 to 100, as lvcreate's N%VG. The thin
+    // pool's metadata takes space on top, so 100 does not fit.
+    uint32 thin_pool_vg_percent = 3;
+  }
 }
 
 // Create pool arguments.
