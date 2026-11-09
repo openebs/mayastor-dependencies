@@ -23,6 +23,10 @@ inputs:
     description: Enable Rust dependencies caching
     required: false
     default: false
+  nix-sources:
+    description: Path to the niv sources.json, used to set the nixpkgs NIX_PATH
+    required: false
+    default: nix/sources.json
 
 runs:
   using: composite
@@ -54,8 +58,10 @@ runs:
         lsblk -fm
     - id: nixpkgs
       shell: bash
+      env:
+        NIX_SOURCES: ${{ inputs.nix-sources }}
       run: |
-        echo "nix_path=nixpkgs=$(jq -r '.nixpkgs.url' nix/sources.json)" >> $GITHUB_OUTPUT
+        echo "nix_path=nixpkgs=$(jq -r '.nixpkgs.url' "$NIX_SOURCES")" >> $GITHUB_OUTPUT
         echo "user=${USER:-$(whoami)}" >> $GITHUB_OUTPUT
     - uses: cachix/install-nix-action@v31.11.1
       with:
