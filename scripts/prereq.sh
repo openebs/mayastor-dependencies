@@ -17,7 +17,7 @@ Usage: $(basename "$0") [OPTIONS]
 Options:
   -h, --help              Display this text.
   --nvme-tcp              Load the nvme_tcp kernel module.
-  --rdma                  Load the nvme_rdma and rdma_rxe (soft-RoCE) kernel modules.
+  --rdma                  Load the nvme_rdma, rdma_ucm and rdma_rxe (soft-RoCE) kernel modules.
   --module <name>         Load the given kernel module (may be repeated).
   --package <name>        Install the given distro package, if not installed (may be repeated).
   --hugepages <num>       Ensure at least <num> 2MiB hugepages are allocated.
@@ -141,7 +141,8 @@ while [ "$#" -gt 0 ]; do
       MODULES+=(nvme_tcp)
       ;;
     --rdma)
-      MODULES+=(nvme_rdma rdma_rxe)
+      # rdma_ucm provides /dev/infiniband/rdma_cm, usually loaded by rdma-core's udev rules
+      MODULES+=(nvme_rdma rdma_ucm rdma_rxe)
       ;;
     --module)
       shift
